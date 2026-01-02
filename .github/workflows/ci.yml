@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'
 
 jobs:
   shellcheck:
@@ -84,6 +87,32 @@ jobs:
       - name: Check help output
         run: |
           "${HOME}/.local/bin/giil" --help | head -20
+
+  real-link-test:
+    name: Real iCloud Link Test
+    needs: [shellcheck, syntax-check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.10.0'
+
+      - name: Cache giil dependencies
+        uses: actions/cache@v4
+        with:
+          path: .ci-cache
+          key: ${{ runner.os }}-giil-${{ hashFiles('giil') }}
+          restore-keys: |
+            ${{ runner.os }}-giil-
+
+      - name: Run real-link test
+        run: |
+          bash scripts/real_link_test.sh
 
   version-consistency:
     name: Version Consistency
