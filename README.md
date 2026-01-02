@@ -27,7 +27,7 @@
 <p align="center">
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh | bash
+curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh?v=2.1.0" | bash
 ```
 
 </p>
@@ -203,7 +203,7 @@ MozJPEG for superior file sizes:
 
 **One-liner (recommended):**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh | bash
+curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh?v=2.1.0" | bash
 ```
 
 <details>
@@ -1039,20 +1039,46 @@ On failure, this saves:
 
 ## 🌐 Environment Variables
 
+### Runtime Variables
+
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `XDG_CACHE_HOME` | Base cache directory | `~/.cache` |
 | `GIIL_HOME` | giil runtime directory | `$XDG_CACHE_HOME/giil` |
 | `PLAYWRIGHT_BROWSERS_PATH` | Custom Chromium cache | `$GIIL_HOME/ms-playwright` |
 | `GIIL_NO_GUM` | Disable gum installation | unset |
+| `GIIL_CHECK_UPDATES` | Enable update checking (set to `1`) | unset |
 | `NODE_OPTIONS` | Node.js options | unset |
 | `CI` | Detected CI environment (disables gum) | unset |
+
+### Installer Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DEST` | Custom install directory | `~/.local/bin` |
+| `GIIL_SYSTEM` | Install to `/usr/local/bin` (set to `1`) | unset |
+| `GIIL_NO_ALIAS` | Skip adding directory to PATH | unset |
+| `GIIL_VERIFY` | Verify SHA256 checksum (set to `1`) | unset |
+| `GIIL_VERSION` | Install specific version | latest |
 
 **Example: Custom cache location**
 ```bash
 export XDG_CACHE_HOME=/var/cache/myapp
 giil "https://share.icloud.com/photos/XXX"
 # Uses /var/cache/myapp/giil/
+```
+
+**Example: Enable update checking**
+```bash
+export GIIL_CHECK_UPDATES=1
+giil "https://share.icloud.com/photos/XXX"
+# Will notify if a newer version is available (once per day)
+```
+
+**Example: Verified installation**
+```bash
+GIIL_VERIFY=1 curl -fsSL .../install.sh | bash
+# Verifies SHA256 checksum against GitHub release
 ```
 
 ---

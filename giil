@@ -50,6 +50,57 @@ NC='\033[0m'
 # Gum availability flag
 GUM_AVAILABLE=false
 
+# Repository info for update checking
+REPO_OWNER="Dicklesworthstone"
+REPO_NAME="get_icloud_image_link"
+VERSION_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/VERSION"
+
+# -----------------------------------------------------------------------------
+# Update checking (opt-in via GIIL_CHECK_UPDATES=1)
+# -----------------------------------------------------------------------------
+
+check_for_updates() {
+    # Only check if explicitly enabled
+    [[ -z "${GIIL_CHECK_UPDATES:-}" ]] && return 0
+
+    # Only check once per day (cache result)
+    # Note: GIIL_HOME is already set at script load time (line 353)
+    local check_file="${GIIL_HOME}/.last_update_check"
+    local one_day=86400
+
+    mkdir -p "$GIIL_HOME" 2>/dev/null || true
+
+    if [[ -f "$check_file" ]]; then
+        local last_check
+        last_check=$(cat "$check_file" 2>/dev/null || echo "0")
+        local now
+        now=$(date +%s)
+        if (( now - last_check < one_day )); then
+            return 0
+        fi
+    fi
+
+    # Fetch remote version (with short timeout to avoid slowing down runs)
+    local remote_version=""
+    if command -v curl &> /dev/null; then
+        remote_version=$(curl -fsSL --connect-timeout 2 --max-time 5 "$VERSION_URL" 2>/dev/null | tr -d '[:space:]') || true
+    elif command -v wget &> /dev/null; then
+        remote_version=$(wget -qO- --timeout=2 "$VERSION_URL" 2>/dev/null | tr -d '[:space:]') || true
+    fi
+
+    # Update check timestamp
+    echo "$(date +%s)" > "$check_file" 2>/dev/null || true
+
+    # Compare versions
+    if [[ -n "$remote_version" && "$remote_version" != "$VERSION" ]]; then
+        # Simple version comparison (works for semver-style versions)
+        if [[ "$remote_version" > "$VERSION" ]]; then
+            echo -e "${YELLOW}[giil]${NC} Update available: ${VERSION} → ${remote_version}" >&2
+            echo -e "${YELLOW}[giil]${NC} Run: curl -fsSL https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/install.sh | bash" >&2
+        fi
+    fi
+}
+
 # -----------------------------------------------------------------------------
 # Gum (charmbracelet) integration for beautiful CLI
 # -----------------------------------------------------------------------------
@@ -1284,6 +1335,9 @@ parse_args() {
 
 main() {
     parse_args "$@"
+
+    # Check for updates (opt-in, runs in background conceptually but blocks minimally)
+    check_for_updates
 
     # Try to use gum for beautiful output (non-blocking)
     check_gum || true
