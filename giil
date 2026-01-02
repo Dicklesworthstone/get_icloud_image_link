@@ -1320,6 +1320,9 @@ parse_args() {
         mkdir -p "$OUTPUT_DIR"
     fi
 
+    # Convert OUTPUT_DIR to absolute path (critical: we cd to GIIL_HOME before running node)
+    OUTPUT_DIR=$(cd "$OUTPUT_DIR" && pwd)
+
     # Normalize URL - support both formats
     # share.icloud.com/photos/XXX -> www.icloud.com/photos/#XXX
     if [[ "$URL" =~ share\.icloud\.com/photos/([A-Za-z0-9_+/=-]+) ]]; then

@@ -49,7 +49,7 @@ jobs:
       - name: Generate release notes
         id: notes
         run: |
-          cat << 'EOF' > release_notes.md
+          cat > release_notes.md << 'EOF'
           ## Installation
 
           ```bash
@@ -68,8 +68,9 @@ jobs:
           ## Checksums
 
           SHA256 checksums for this release are attached as `checksums.sha256`.
-
           EOF
+          # Remove leading whitespace from each line (YAML indentation artifact)
+          sed -i 's/^          //' release_notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
