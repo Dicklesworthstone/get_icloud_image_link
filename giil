@@ -477,6 +477,10 @@ Options:
   --quality N      JPEG/WebP quality 1-100 (default: 85, with --optimize/--convert)
   --update         Force update Playwright and dependencies
   --debug          Enable debug mode with extra logging and artifacts
+  --verbose        Show detailed progress (implies --debug)
+  --trace          Enable Playwright tracing for deep debugging
+  --print-url      Output resolved direct URL instead of downloading
+  --debug-dir DIR  Directory for debug artifacts (default: current)
   --timeout N      Page load timeout in seconds (default: 60)
   --version        Show version information
   --help           Show this help message
@@ -900,9 +904,18 @@ const jsonOutput = args[6] === 'true';
 const allMode = args[7] === 'true';
 const optimizeMode = args[8] === 'true';
 const convertFormat = args[9] || '';  // 'jpeg', 'png', 'webp', or ''
+const verboseMode = args[10] === 'true';
+const traceMode = args[11] === 'true';
+const printUrlMode = args[12] === 'true';
+const debugDir = args[13] || '';
+
+// Verbose logging helper
+function verbose(msg) {
+    if (verboseMode) console.error(`[giil] ${msg}`);
+}
 
 if (!url) {
-    console.error('Usage: node extractor.mjs <url> <outputDir> <quality> <base64> <debug> <timeout> <json> <all> <optimize> <convert>');
+    console.error('Usage: node extractor.mjs <url> <outputDir> <quality> <base64> <debug> <timeout> <json> <all> <optimize> <convert> <verbose> <trace> <printUrl> <debugDir>');
     process.exit(ExitCodes.USAGE_ERROR);
 }
 
@@ -1140,6 +1153,82 @@ function validateGoogleDriveResponse(buffer) {
     }
 
     return { isError: false, errorType: null, message: null };
+}
+
+/**
+ * Multi-tier capture strategy for Google Drive files
+ * @param {import('playwright').Page} page - Playwright page
+ * @param {string} fileId - Google Drive file ID
+ * @param {boolean} debugMode - Debug logging
+ * @returns {Promise<Object|null>} Capture result or null
+ */
+async function captureGoogleDrive(page, fileId, debugMode) {
+    // TIER 1: Download button
+    if (debugMode) console.error('[giil:debug] GDrive: Trying download button...');
+    try {
+        for (const sel of ['button[aria-label="Download"]', '[data-tooltip="Download"]']) {
+            const btn = await page.$(sel);
+            if (btn) {
+                const dlPromise = page.waitForEvent('download', { timeout: 10000 });
+                await btn.click();
+                const dl = await dlPromise;
+                const path = await dl.path();
+                if (path) {
+                    const buf = readFileSync(path);
+                    console.error('[giil] GDrive download: ' + (buf.length / 1024).toFixed(1) + ' KB');
+                    return { bytes: buf, method: 'download-button', tier: 1, sourceUrl: getGoogleDriveViewerUrl(fileId) };
+                }
+            }
+        }
+    } catch (e) { if (debugMode) console.error('[giil:debug] Download failed: ' + e.message); }
+
+    // TIER 2: Direct URL
+    if (debugMode) console.error('[giil:debug] GDrive: Trying direct URL...');
+    try {
+        const url = getGoogleDriveDownloadUrl(fileId);
+        const res = await fetch(url, { redirect: 'follow' });
+        if (res.ok && (res.headers.get('content-type') || '').startsWith('image/')) {
+            const buf = Buffer.from(await res.arrayBuffer());
+            if (!validateGoogleDriveResponse(buf).isError) {
+                console.error('[giil] GDrive direct: ' + (buf.length / 1024).toFixed(1) + ' KB');
+                return { bytes: buf, method: 'direct-url', tier: 2, sourceUrl: url };
+            }
+        }
+    } catch (e) { if (debugMode) console.error('[giil:debug] Direct failed: ' + e.message); }
+
+    // TIER 3: Thumbnail
+    if (debugMode) console.error('[giil:debug] GDrive: Trying thumbnail...');
+    try {
+        const url = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w4000';
+        const res = await fetch(url);
+        if (res.ok) {
+            const buf = Buffer.from(await res.arrayBuffer());
+            if (validateMagicBytes(buf).isImage) {
+                console.error('[giil] GDrive thumbnail: ' + (buf.length / 1024).toFixed(1) + ' KB');
+                return { bytes: buf, method: 'thumbnail', tier: 3, sourceUrl: url, isPreview: true };
+            }
+        }
+    } catch (e) { if (debugMode) console.error('[giil:debug] Thumbnail failed: ' + e.message); }
+
+    // TIER 4: Screenshot
+    if (debugMode) console.error('[giil:debug] GDrive: Screenshot fallback...');
+    try {
+        for (const sel of ['img[src*="drive.google.com"]', '[role="img"]']) {
+            const el = await page.$(sel);
+            if (el && await el.isVisible().catch(() => false)) {
+                const box = await el.boundingBox();
+                if (box && box.width > 100 && box.height > 100) {
+                    const buf = await el.screenshot({ type: 'png' });
+                    console.error('[giil] GDrive element screenshot: ' + (buf.length / 1024).toFixed(1) + ' KB');
+                    return { bytes: buf, method: 'element-screenshot', tier: 4, sourceUrl: getGoogleDriveViewerUrl(fileId) };
+                }
+            }
+        }
+        const buf = await page.screenshot({ type: 'png' });
+        return { bytes: buf, method: 'viewport-screenshot', tier: 4, sourceUrl: getGoogleDriveViewerUrl(fileId) };
+    } catch (e) { console.error('[giil] GDrive screenshot failed: ' + e.message); }
+
+    return null;
 }
 
 // v3 JSON Schema Helper: format success output
@@ -1789,6 +1878,9 @@ function resetImageCapture(capture) {
 
 // Main extraction function
 async function extractImage() {
+    verbose(`Platform detected: ${detectPlatform(url)}`);
+    verbose('Launching Playwright (headless)');
+
     const browser = await chromium.launch({
         headless: true,
         args: [
@@ -1805,6 +1897,16 @@ async function extractImage() {
         acceptDownloads: true
     });
 
+    // Start tracing if requested
+    let tracePath = null;
+    if (traceMode) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '').slice(0, 15);
+        const traceDir = debugDir || outputDir || '.';
+        tracePath = path.join(traceDir, `giil_trace_${timestamp}.zip`);
+        verbose(`Playwright tracing enabled, will save to: ${tracePath}`);
+        await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+    }
+
     const page = await context.newPage();
     const timeoutMs = timeoutSec * 1000;
     const results = [];
@@ -1812,6 +1914,7 @@ async function extractImage() {
     // Set up image capture handler BEFORE navigation
     const { capture: imageCapture, handler: responseHandler } = createImageCaptureHandler(debugMode);
     page.on('response', responseHandler);
+    verbose('Network interceptor installed');
 
     try {
         // Navigate to page
@@ -1836,6 +1939,27 @@ async function extractImage() {
         const settleTimeout = Math.min(timeoutMs, 30000);
         await page.waitForLoadState('networkidle', { timeout: settleTimeout }).catch(() => {});
         await sleep(1000);
+        verbose('Page load complete, network idle');
+
+        // --print-url mode: extract and output URL, don't download
+        if (printUrlMode) {
+            const capturedUrl = imageCapture.url;
+            const platform = detectPlatform(url);
+
+            verbose(`Captured URL: ${capturedUrl || 'none'}`);
+
+            if (capturedUrl) {
+                if (jsonOutput) {
+                    console.log(JSON.stringify({ url: capturedUrl, platform, sourceUrl: url }));
+                } else {
+                    console.log(capturedUrl);
+                }
+                process.exit(ExitCodes.SUCCESS);
+            } else {
+                console.error('[giil] No direct URL captured (page may require interaction)');
+                process.exit(ExitCodes.CAPTURE_FAILURE);
+            }
+        }
 
         if (allMode) {
             // ========================================
@@ -2035,6 +2159,18 @@ async function extractImage() {
         throw error;
     } finally {
         page.off('response', responseHandler);
+
+        // Save trace if enabled
+        if (traceMode && tracePath) {
+            try {
+                await context.tracing.stop({ path: tracePath });
+                console.error(`[giil] Trace saved: ${tracePath}`);
+                console.error(`[giil] View trace: npx playwright show-trace ${tracePath}`);
+            } catch (e) {
+                console.error(`[giil] Failed to save trace: ${e.message}`);
+            }
+        }
+
         await browser.close();
     }
 }
@@ -2138,6 +2274,27 @@ parse_args() {
                 DEBUG_MODE=true
                 shift
                 ;;
+            --verbose)
+                VERBOSE=true
+                DEBUG_MODE=true  # --verbose implies --debug
+                shift
+                ;;
+            --trace)
+                TRACE_MODE=true
+                shift
+                ;;
+            --print-url)
+                PRINT_URL=true
+                shift
+                ;;
+            --debug-dir)
+                if [[ -z "${2:-}" || "$2" == --* ]]; then
+                    log_error "--debug-dir requires a directory argument"
+                    exit "$EXIT_USAGE_ERROR"
+                fi
+                DEBUG_DIR="$2"
+                shift 2
+                ;;
             --optimize)
                 OPTIMIZE_MODE=true
                 shift
@@ -2240,6 +2397,16 @@ download_dropbox_direct() {
     # Normalize URL to direct download format
     local raw_url
     raw_url=$(normalize_dropbox_url "$URL")
+
+    # --print-url mode: just output the URL and exit
+    if [[ "$PRINT_URL" == "true" ]]; then
+        if [[ "$JSON_OUTPUT" == "true" ]]; then
+            echo "{\"url\":\"${raw_url}\",\"platform\":\"dropbox\"}"
+        else
+            echo "$raw_url"
+        fi
+        exit "$EXIT_SUCCESS"
+    fi
 
     log_step "Dropbox detected - using fast direct download..."
     log_debug "Raw URL: $raw_url"
@@ -2378,9 +2545,13 @@ main() {
             log_debug "All mode: $ALL_MODE"
             log_debug "Optimize: $OPTIMIZE_MODE"
             log_debug "Convert: ${CONVERT_FORMAT:-none}"
+            log_debug "Verbose: $VERBOSE"
+            log_debug "Trace: $TRACE_MODE"
+            log_debug "Print URL: $PRINT_URL"
+            log_debug "Debug dir: ${DEBUG_DIR:-cwd}"
 
             cd "$GIIL_HOME"
-            node "$script_path" "$URL" "$OUTPUT_DIR" "$QUALITY" "$BASE64_OUTPUT" "$DEBUG_MODE" "$TIMEOUT" "$JSON_OUTPUT" "$ALL_MODE" "$OPTIMIZE_MODE" "$CONVERT_FORMAT"
+            node "$script_path" "$URL" "$OUTPUT_DIR" "$QUALITY" "$BASE64_OUTPUT" "$DEBUG_MODE" "$TIMEOUT" "$JSON_OUTPUT" "$ALL_MODE" "$OPTIMIZE_MODE" "$CONVERT_FORMAT" "$VERBOSE" "$TRACE_MODE" "$PRINT_URL" "$DEBUG_DIR"
             ;;
     esac
 }
