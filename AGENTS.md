@@ -111,7 +111,7 @@ This is a **hybrid project**: a Bash wrapper script with an embedded Node.js ext
 
 ```
 get_icloud_image_link/
-├── giil                                    # Main script (~1500 LOC bash + embedded JS)
+├── giil                                    # Main script (~2600 LOC: ~1150 bash + ~1450 embedded JS)
 ├── install.sh                              # Curl-bash installer (~350 LOC)
 ├── README.md                               # Comprehensive documentation
 ├── VERSION                                 # Semver version file (e.g., "2.1.0")
@@ -126,7 +126,11 @@ get_icloud_image_link/
 └── scripts/
     ├── real_link_test.sh                   # Integration test with real iCloud links
     ├── check_playwright_setup.sh           # Playwright verification utility
-    └── real_icloud_expected.sha256         # Expected checksum for test image
+    ├── real_icloud_expected.sha256         # Expected checksum for test image
+    └── tests/                              # Unit test framework
+        ├── run-tests.sh                    # Test runner
+        ├── extract-functions.mjs           # Extracts pure functions from giil
+        └── *.test.mjs                      # Test files (platform-detection, etc.)
 ```
 
 ### Embedded Components
@@ -136,7 +140,7 @@ The `giil` script contains an embedded Node.js extractor generated via heredoc:
 ```
 giil (bash)
 └── create_extractor_script()
-    └── Generates: ~/.cache/giil/extractor.mjs (~585 LOC JavaScript)
+    └── Generates: ~/.cache/giil/extractor.mjs (~1450 LOC JavaScript)
         ├── Playwright browser automation
         ├── Network interception (CDN capture)
         ├── 4-tier capture strategy

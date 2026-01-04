@@ -95,8 +95,10 @@ This bridges your Apple devices and remote AI coding sessions. No file transfers
 - [Capture Strategies in Detail](#-capture-strategies-in-detail)
 - [Platform-Specific Optimizations](#-platform-specific-optimizations)
 - [Image Processing Pipeline](#-image-processing-pipeline)
+- [Download Verification](#-download-verification)
 - [Design Principles](#-design-principles)
 - [Architecture](#-architecture)
+- [Testing & Quality Assurance](#-testing--quality-assurance)
 - [File Locations](#-file-locations)
 - [Performance](#-performance)
 - [Troubleshooting](#-troubleshooting)
@@ -482,6 +484,32 @@ giil "https://share.icloud.com/photos/XXX" --all --output ~/album
 - **Indexed filenames:** `_001`, `_002`, etc. for ordering
 - **Collision-free:** Appends counter if filename exists
 - **Progress feedback:** Shows `Photo 1/N...` on stderr
+
+### Rate Limiting & Polite Downloading
+
+Album mode implements respectful rate limiting to avoid overwhelming cloud services:
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  Photo 1    │────▶│   1 second  │────▶│  Photo 2    │────▶ ...
+│  Download   │     │    delay    │     │  Download   │
+└─────────────┘     └─────────────┘     └─────────────┘
+```
+
+**Fixed delays:**
+- **1 second** between album photos — Prevents overwhelming iCloud servers
+- Applies after each successful or failed download
+
+**Exponential backoff:**
+- If the server returns rate-limiting signals, giil backs off exponentially
+- Base multiplier of **2** (1s → 2s → 4s → 8s → ...)
+- Automatic retry with increasing delays
+
+**Why this matters:**
+- Reduces risk of IP-based rate limiting or temporary bans
+- Prevents triggering anti-abuse measures
+- Allows iCloud to serve other users fairly
+- Improves overall reliability of large album downloads
 
 ---
 
@@ -869,6 +897,105 @@ icloud_20240115_143245_001_1.jpg    # Collision (file existed)
 
 ---
 
+## 🔍 Download Verification
+
+giil implements a multi-layer content validation system to ensure downloads are valid images, not error pages or corrupted data.
+
+### The Problem
+
+Cloud services often return HTML error pages with 200 status codes, making it impossible to detect failures from HTTP status alone:
+
+```
+❌ Expected: JPEG image data
+✓ Received: HTTP 200
+❌ Actual content: <html><body>This link has expired</body></html>
+```
+
+### Content Validation Pipeline
+
+Every downloaded file passes through three validation checks before being accepted:
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Content-Type   │────▶│  Magic Bytes    │────▶│  HTML Error     │
+│   Validation    │     │   Detection     │     │   Detection     │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+        │                       │                       │
+        ▼                       ▼                       ▼
+   Check MIME type         Verify file            Reject HTML
+   matches image        signature bytes         error pages
+```
+
+### Stage 1: Content-Type Validation
+
+Validates the HTTP `Content-Type` header matches expected image types:
+
+```javascript
+// Accepted MIME types:
+'image/jpeg'
+'image/png'
+'image/webp'
+'image/heic'
+'image/heif'
+'image/gif'
+'application/octet-stream'  // Binary fallback (validated by magic bytes)
+```
+
+### Stage 2: Magic Bytes Detection
+
+Verifies the file's binary signature matches known image formats, regardless of what the server claimed:
+
+| Format | Magic Bytes (hex) | Description |
+|--------|-------------------|-------------|
+| JPEG | `FF D8 FF` | JFIF/Exif image |
+| PNG | `89 50 4E 47` | Portable Network Graphics |
+| GIF | `47 49 46 38` | Graphics Interchange Format |
+| WebP | `52 49 46 46...57 45 42 50` | RIFF container with WEBP |
+| HEIC/HEIF | `00 00 00...66 74 79 70` | ISO base media file (ftyp box) |
+| BMP | `42 4D` | Windows Bitmap |
+
+**Why this matters:** A server might claim `Content-Type: image/jpeg` but actually serve an HTML error page. Magic bytes catch this.
+
+### Stage 3: HTML Error Page Detection
+
+Scans the first bytes of content for HTML signatures that indicate an error page was returned instead of an image:
+
+```javascript
+// Rejected patterns:
+'<!DOCTYPE'
+'<!doctype'
+'<html'
+'<HTML'
+'<head'
+'<HEAD'
+```
+
+**Edge case handling:** Some valid images (especially JPEG) can contain embedded metadata that coincidentally matches HTML patterns. giil validates magic bytes *first*, so a valid JPEG with HTML-like EXIF comments passes validation.
+
+### HEIC-in-JPEG Detection
+
+A special case: Apple devices sometimes wrap HEIC data inside a JPEG container. giil detects this by scanning for the `ftypheic` signature after the JPEG header and triggers HEIC conversion:
+
+```javascript
+// Detect HEIC hidden in JPEG wrapper
+if (startsWithJPEG && containsHeicSignature) {
+    // Extract and convert the inner HEIC data
+}
+```
+
+### Validation in Practice
+
+```bash
+# giil validates automatically - no flags needed
+giil "https://share.icloud.com/photos/XXX"
+
+# If validation fails, you'll see:
+# [giil] Error: Downloaded content is not a valid image
+# [giil] Received HTML error page instead of image data
+```
+
+---
+
 ## 🧭 Design Principles
 
 ### 1. Self-Healing Dependencies
@@ -957,7 +1084,7 @@ GIIL_HOME="${GIIL_HOME:-$CACHE_HOME/giil}"
 ### Component Overview
 
 ```
-giil (bash, ~740 LOC)
+giil (bash wrapper, ~1,150 LOC)
 ├── CLI argument parsing
 ├── OS detection (macOS/Linux)
 ├── Node.js installation
@@ -967,7 +1094,7 @@ giil (bash, ~740 LOC)
 ├── Extractor script generation
 └── Node.js invocation
 
-extractor.mjs (JavaScript, ~585 LOC)
+extractor.mjs (embedded JavaScript, ~1,450 LOC)
 ├── Playwright browser management
 ├── Response interception handler
 ├── Download button detector
@@ -999,6 +1126,104 @@ giil
  │
  └── gum (optional)
       └── charmbracelet CLI styling
+```
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+giil includes a comprehensive testing infrastructure to ensure reliability.
+
+### Unit Test Framework
+
+The test suite validates pure JavaScript functions extracted from the embedded extractor:
+
+```
+scripts/tests/
+├── run-tests.sh              # Test runner
+├── extract-functions.mjs     # Extracts pure functions from giil
+├── platform-detection.test.mjs    # Platform URL detection tests
+└── (more test files...)
+```
+
+**Running tests:**
+```bash
+# Run all unit tests
+./scripts/tests/run-tests.sh
+
+# Output:
+# === giil Unit Tests ===
+# [1/2] Verifying function extraction...
+#       Extraction OK
+# [2/2] Running unit tests...
+# ✓ detectPlatform > iCloud URLs > detects share.icloud.com/photos URLs
+# ...
+# Done!
+```
+
+**Test architecture:**
+- Tests use Node.js 18+ native test runner (`node:test`)
+- Functions are extracted from giil at test time (no separate source files)
+- Each test file independently extracts functions in its `before()` hook
+
+### What's Tested
+
+| Test Suite | Coverage |
+|------------|----------|
+| Platform Detection | URL pattern matching for iCloud, Dropbox, Google Photos, Google Drive |
+| Domain Boundary Checks | Rejects fake domains (e.g., `fakedropbox.com` vs `dropbox.com`) |
+| Case Insensitivity | URL matching works regardless of case |
+| Edge Cases | Empty strings, malformed URLs, query parameters |
+
+### CI Pipeline
+
+GitHub Actions runs quality checks on every push:
+
+```yaml
+# .github/workflows/ci.yml
+jobs:
+  unit-tests:
+    - Setup Node.js 18
+    - Run: ./scripts/tests/run-tests.sh
+
+  shellcheck:
+    - Lint giil and install.sh
+    - Fail on warning-level issues
+
+  syntax-validation:
+    - Verify bash syntax
+    - Verify embedded JS syntax
+
+  installation-test:
+    - Test curl-bash installer
+    - Verify giil runs after install
+```
+
+### Integration Tests
+
+For testing against real iCloud links:
+
+```bash
+# Requires GIIL_REAL_TEST_URL environment variable
+./scripts/real_link_test.sh
+```
+
+This test:
+1. Downloads from a real iCloud share link
+2. Verifies the file matches expected SHA256 checksum
+3. Validates image dimensions and format
+
+### Code Quality
+
+**ShellCheck** enforces bash best practices:
+```bash
+shellcheck -x giil install.sh
+```
+
+**Embedded JavaScript** syntax validation:
+```bash
+# Extract and check JS syntax
+node --check ~/.cache/giil/extractor.mjs
 ```
 
 ---
@@ -1358,7 +1583,7 @@ GIIL_VERIFY=1 curl -fsSL .../install.sh | bash
 
 ### Audit
 
-The entire codebase is contained in a single bash script (~1,325 lines) with an embedded JavaScript extractor (~585 lines):
+The entire codebase is contained in a single bash script (~1,150 lines of bash wrapper) with an embedded JavaScript extractor (~1,450 lines):
 
 ```bash
 less ~/.local/bin/giil
