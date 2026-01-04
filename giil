@@ -35,7 +35,7 @@
 
 set -euo pipefail
 
-VERSION="3.0.0"
+VERSION="3.1.0"
 
 # -----------------------------------------------------------------------------
 # Exit Codes (v3.0+ extended scheme with backwards compatibility)
