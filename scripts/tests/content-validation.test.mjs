@@ -17,7 +17,8 @@ let validateContentType, validateMagicBytes, validateImageContent;
 
 before(async () => {
     const extractorPath = join(__dirname, 'extract-functions.mjs');
-    const tempModule = `/tmp/giil-test-content-validation-${process.pid}.mjs`;
+    const projectRoot = join(__dirname, "../..");
+    const tempModule = join(projectRoot, `giil-test-content-validation-${process.pid}.mjs`);
 
     const extracted = execSync(`node "${extractorPath}"`, { encoding: 'utf8' });
     writeFileSync(tempModule, extracted);

@@ -18,7 +18,8 @@ let extractGooglePhotosBaseUrl;
 before(async () => {
     // Extract pure functions from giil
     const extractorPath = join(__dirname, 'extract-functions.mjs');
-    const tempModule = `/tmp/giil-test-google-photos-url-${process.pid}.mjs`;
+    const projectRoot = join(__dirname, "../..");
+    const tempModule = join(projectRoot, `giil-test-google-photos-url-${process.pid}.mjs`);
 
     // Run extraction
     const extracted = execSync(`node "${extractorPath}"`, { encoding: 'utf8' });
