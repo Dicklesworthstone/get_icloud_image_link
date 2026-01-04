@@ -3,29 +3,37 @@
  * Tests validateGoogleDriveResponse() for error detection in HTTP responses
  */
 
-import { describe, it, before } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
-import { writeFileSync, unlinkSync } from 'fs';
+import { writeFileSync, unlinkSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-let validateGoogleDriveResponse;
+// Wrap all tests in a parent describe to ensure before() completes first
+describe('Google Drive Validation Tests', () => {
+    let validateGoogleDriveResponse;
+    let tempModule;
 
-before(async () => {
-    const extractorPath = join(__dirname, 'extract-functions.mjs');
-    const projectRoot = join(__dirname, "../..");
-    const tempModule = join(projectRoot, `giil-test-google-drive-validation-${process.pid}.mjs`);
-    const extracted = execSync(`node "${extractorPath}"`, { encoding: 'utf8' });
-    writeFileSync(tempModule, extracted);
-    const mod = await import(tempModule);
-    validateGoogleDriveResponse = mod.validateGoogleDriveResponse;
-    try { unlinkSync(tempModule); } catch {}
-});
+    before(async () => {
+        const extractorPath = join(__dirname, 'extract-functions.mjs');
+        const projectRoot = join(__dirname, "../..");
+        tempModule = join(projectRoot, `giil-test-google-drive-validation-${process.pid}.mjs`);
+        const extracted = execSync(`node "${extractorPath}"`, { encoding: 'utf8' });
+        writeFileSync(tempModule, extracted);
+        const mod = await import(tempModule);
+        validateGoogleDriveResponse = mod.validateGoogleDriveResponse;
+    });
 
-describe('validateGoogleDriveResponse', () => {
+    after(() => {
+        if (tempModule && existsSync(tempModule)) {
+            try { unlinkSync(tempModule); } catch {}
+        }
+    });
+
+    describe('validateGoogleDriveResponse', () => {
     describe('valid responses', () => {
         it('accepts valid JPEG buffer', () => {
             // Create a fake JPEG-like buffer (magic bytes + padding)
@@ -202,3 +210,4 @@ describe('validateGoogleDriveResponse', () => {
         });
     });
 });
+}); // Close wrapper describe('Google Drive Validation Tests')

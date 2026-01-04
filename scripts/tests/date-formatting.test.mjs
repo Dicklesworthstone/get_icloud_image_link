@@ -3,31 +3,39 @@
  * Tests formatDateForFilename() and formatDateForJson()
  */
 
-import { describe, it, before } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
-import { writeFileSync, unlinkSync } from 'fs';
+import { writeFileSync, unlinkSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-let formatDateForFilename;
-let formatDateForJson;
+// Wrap all tests in a parent describe to ensure before() completes first
+describe('Date Formatting Tests', () => {
+    let formatDateForFilename;
+    let formatDateForJson;
+    let tempModule;
 
-before(async () => {
-    const extractorPath = join(__dirname, 'extract-functions.mjs');
-    const projectRoot = join(__dirname, "../..");
-    const tempModule = join(projectRoot, `giil-test-date-formatting-${process.pid}.mjs`);
-    const extracted = execSync(`node "${extractorPath}"`, { encoding: 'utf8' });
-    writeFileSync(tempModule, extracted);
-    const mod = await import(tempModule);
-    formatDateForFilename = mod.formatDateForFilename;
-    formatDateForJson = mod.formatDateForJson;
-    try { unlinkSync(tempModule); } catch {}
-});
+    before(async () => {
+        const extractorPath = join(__dirname, 'extract-functions.mjs');
+        const projectRoot = join(__dirname, "../..");
+        tempModule = join(projectRoot, `giil-test-date-formatting-${process.pid}.mjs`);
+        const extracted = execSync(`node "${extractorPath}"`, { encoding: 'utf8' });
+        writeFileSync(tempModule, extracted);
+        const mod = await import(tempModule);
+        formatDateForFilename = mod.formatDateForFilename;
+        formatDateForJson = mod.formatDateForJson;
+    });
 
-describe('formatDateForFilename', () => {
+    after(() => {
+        if (tempModule && existsSync(tempModule)) {
+            try { unlinkSync(tempModule); } catch {}
+        }
+    });
+
+    describe('formatDateForFilename', () => {
     describe('basic formatting', () => {
         it('formats a date as YYYYMMDD_HHMMSS', () => {
             const date = new Date('2025-03-15T14:30:45.000Z');
@@ -120,3 +128,4 @@ describe('formatDateForJson', () => {
         });
     });
 });
+}); // Close wrapper describe('Date Formatting Tests')

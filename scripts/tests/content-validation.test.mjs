@@ -3,35 +3,42 @@
  * Tests validateContentType(), validateMagicBytes(), validateImageContent()
  */
 
-import { describe, it, before } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
-import { writeFileSync, unlinkSync } from 'fs';
+import { writeFileSync, unlinkSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Extract functions before tests run
-let validateContentType, validateMagicBytes, validateImageContent;
+// Wrap all tests in a parent describe to ensure before() completes first
+describe('Content Validation Tests', () => {
+    // Extract functions before tests run
+    let validateContentType, validateMagicBytes, validateImageContent;
+    let tempModule;
 
-before(async () => {
-    const extractorPath = join(__dirname, 'extract-functions.mjs');
-    const projectRoot = join(__dirname, "../..");
-    const tempModule = join(projectRoot, `giil-test-content-validation-${process.pid}.mjs`);
+    before(async () => {
+        const extractorPath = join(__dirname, 'extract-functions.mjs');
+        const projectRoot = join(__dirname, "../..");
+        tempModule = join(projectRoot, `giil-test-content-validation-${process.pid}.mjs`);
 
-    const extracted = execSync(`node "${extractorPath}"`, { encoding: 'utf8' });
-    writeFileSync(tempModule, extracted);
+        const extracted = execSync(`node "${extractorPath}"`, { encoding: 'utf8' });
+        writeFileSync(tempModule, extracted);
 
-    const mod = await import(tempModule);
-    validateContentType = mod.validateContentType;
-    validateMagicBytes = mod.validateMagicBytes;
-    validateImageContent = mod.validateImageContent;
+        const mod = await import(tempModule);
+        validateContentType = mod.validateContentType;
+        validateMagicBytes = mod.validateMagicBytes;
+        validateImageContent = mod.validateImageContent;
+    });
 
-    try { unlinkSync(tempModule); } catch {}
-});
+    after(() => {
+        if (tempModule && existsSync(tempModule)) {
+            try { unlinkSync(tempModule); } catch {}
+        }
+    });
 
-describe('validateContentType', () => {
+    describe('validateContentType', () => {
     describe('Valid image types', () => {
         it('accepts image/jpeg', () => {
             const result = validateContentType('image/jpeg');
@@ -249,3 +256,4 @@ describe('validateImageContent', () => {
         assert.strictEqual(result.isImage, true);
     });
 });
+}); // Close wrapper describe('Content Validation Tests')

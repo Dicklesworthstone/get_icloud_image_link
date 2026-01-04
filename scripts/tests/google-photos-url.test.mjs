@@ -3,37 +3,39 @@
  * Tests the extractGooglePhotosBaseUrl() function for =s0 full-res URL generation
  */
 
-import { describe, it, before } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
-import { writeFileSync, unlinkSync } from 'fs';
+import { writeFileSync, unlinkSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Extract functions before tests run
-let extractGooglePhotosBaseUrl;
+// Wrap all tests in a parent describe to ensure before() completes first
+describe('Google Photos URL Tests', () => {
+    let extractGooglePhotosBaseUrl;
+    let tempModule;
 
-before(async () => {
-    // Extract pure functions from giil
-    const extractorPath = join(__dirname, 'extract-functions.mjs');
-    const projectRoot = join(__dirname, "../..");
-    const tempModule = join(projectRoot, `giil-test-google-photos-url-${process.pid}.mjs`);
+    before(async () => {
+        const extractorPath = join(__dirname, 'extract-functions.mjs');
+        const projectRoot = join(__dirname, "../..");
+        tempModule = join(projectRoot, `giil-test-google-photos-url-${process.pid}.mjs`);
 
-    // Run extraction
-    const extracted = execSync(`node "${extractorPath}"`, { encoding: 'utf8' });
-    writeFileSync(tempModule, extracted);
+        const extracted = execSync(`node "${extractorPath}"`, { encoding: 'utf8' });
+        writeFileSync(tempModule, extracted);
 
-    // Dynamic import the extracted module
-    const mod = await import(tempModule);
-    extractGooglePhotosBaseUrl = mod.extractGooglePhotosBaseUrl;
+        const mod = await import(tempModule);
+        extractGooglePhotosBaseUrl = mod.extractGooglePhotosBaseUrl;
+    });
 
-    // Cleanup
-    try { unlinkSync(tempModule); } catch {}
-});
+    after(() => {
+        if (tempModule && existsSync(tempModule)) {
+            try { unlinkSync(tempModule); } catch {}
+        }
+    });
 
-describe('extractGooglePhotosBaseUrl', () => {
+    describe('extractGooglePhotosBaseUrl', () => {
     describe('URL with size modifier', () => {
         it('strips =w1920-h1080 size modifier', () => {
             const result = extractGooglePhotosBaseUrl(
@@ -152,3 +154,4 @@ describe('extractGooglePhotosBaseUrl', () => {
         });
     });
 });
+}); // Close wrapper describe('Google Photos URL Tests')

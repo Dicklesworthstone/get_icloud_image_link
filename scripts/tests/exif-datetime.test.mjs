@@ -3,37 +3,42 @@
  * Tests parsing of EXIF DateTimeOriginal and fallback fields from image buffers
  */
 
-import { describe, it, before } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
-import { writeFileSync, unlinkSync, readFileSync } from 'fs';
+import { writeFileSync, unlinkSync, readFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Extract functions before tests run
-let getExifDateTime;
+// Wrap all tests in a parent describe to ensure before() completes first
+describe('EXIF DateTime Tests', () => {
+    let getExifDateTime;
+    let tempModule;
 
-before(async () => {
-    const extractorPath = join(__dirname, 'extract-functions.mjs');
-    const projectRoot = join(__dirname, '../..');
-    // Write to project root so it can find node_modules/exifr
-    const tempModule = join(projectRoot, `giil-test-exif-datetime-${process.pid}.mjs`);
+    before(async () => {
+        const extractorPath = join(__dirname, 'extract-functions.mjs');
+        const projectRoot = join(__dirname, '../..');
+        tempModule = join(projectRoot, `giil-test-exif-datetime-${process.pid}.mjs`);
 
-    const extracted = execSync(`node "${extractorPath}"`, {
-        encoding: 'utf8',
-        cwd: projectRoot
+        const extracted = execSync(`node "${extractorPath}"`, {
+            encoding: 'utf8',
+            cwd: projectRoot
+        });
+        writeFileSync(tempModule, extracted);
+
+        const mod = await import(tempModule);
+        getExifDateTime = mod.getExifDateTime;
     });
-    writeFileSync(tempModule, extracted);
 
-    const mod = await import(tempModule);
-    getExifDateTime = mod.getExifDateTime;
+    after(() => {
+        if (tempModule && existsSync(tempModule)) {
+            try { unlinkSync(tempModule); } catch {}
+        }
+    });
 
-    try { unlinkSync(tempModule); } catch {}
-});
-
-describe('getExifDateTime', () => {
+    describe('getExifDateTime', () => {
     describe('valid images with EXIF', () => {
         it('returns Date object for JPEG with DateTimeOriginal', async () => {
             // Use the sample JPEG we have - even without EXIF it tests the path
@@ -142,3 +147,4 @@ describe('getExifDateTime', () => {
         });
     });
 });
+}); // Close wrapper describe('EXIF DateTime Tests')

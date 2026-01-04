@@ -3,41 +3,43 @@
  * Tests extractGoogleDriveFileId, getGoogleDriveDownloadUrl, getGoogleDriveViewerUrl
  */
 
-import { describe, it, before } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
-import { writeFileSync, unlinkSync } from 'fs';
+import { writeFileSync, unlinkSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Extract functions before tests run
-let extractGoogleDriveFileId;
-let getGoogleDriveDownloadUrl;
-let getGoogleDriveViewerUrl;
+// Wrap all tests in a parent describe to ensure before() completes first
+describe('Google Drive URL Tests', () => {
+    let extractGoogleDriveFileId;
+    let getGoogleDriveDownloadUrl;
+    let getGoogleDriveViewerUrl;
+    let tempModule;
 
-before(async () => {
-    // Extract pure functions from giil
-    const extractorPath = join(__dirname, 'extract-functions.mjs');
-    const projectRoot = join(__dirname, "../..");
-    const tempModule = join(projectRoot, `giil-test-google-drive-${process.pid}.mjs`);
+    before(async () => {
+        const extractorPath = join(__dirname, 'extract-functions.mjs');
+        const projectRoot = join(__dirname, "../..");
+        tempModule = join(projectRoot, `giil-test-google-drive-${process.pid}.mjs`);
 
-    // Run extraction
-    const extracted = execSync(`node "${extractorPath}"`, { encoding: 'utf8' });
-    writeFileSync(tempModule, extracted);
+        const extracted = execSync(`node "${extractorPath}"`, { encoding: 'utf8' });
+        writeFileSync(tempModule, extracted);
 
-    // Dynamic import the extracted module
-    const mod = await import(tempModule);
-    extractGoogleDriveFileId = mod.extractGoogleDriveFileId;
-    getGoogleDriveDownloadUrl = mod.getGoogleDriveDownloadUrl;
-    getGoogleDriveViewerUrl = mod.getGoogleDriveViewerUrl;
+        const mod = await import(tempModule);
+        extractGoogleDriveFileId = mod.extractGoogleDriveFileId;
+        getGoogleDriveDownloadUrl = mod.getGoogleDriveDownloadUrl;
+        getGoogleDriveViewerUrl = mod.getGoogleDriveViewerUrl;
+    });
 
-    // Cleanup
-    try { unlinkSync(tempModule); } catch {}
-});
+    after(() => {
+        if (tempModule && existsSync(tempModule)) {
+            try { unlinkSync(tempModule); } catch {}
+        }
+    });
 
-describe('extractGoogleDriveFileId', () => {
+    describe('extractGoogleDriveFileId', () => {
     describe('/file/d/{id}/view format', () => {
         it('extracts ID from standard file view URL', () => {
             const id = extractGoogleDriveFileId(
@@ -194,3 +196,4 @@ describe('integration: URL roundtrip', () => {
         assert.strictEqual(download1, download2);
     });
 });
+}); // Close wrapper describe('Google Drive URL Tests')
