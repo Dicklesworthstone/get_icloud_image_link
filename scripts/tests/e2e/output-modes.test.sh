@@ -192,11 +192,17 @@ test_preserve_mode() {
 
     log_info "Testing: --preserve mode (skip compression)..."
 
+    # Use separate subdirectories to avoid filename collisions
+    # (giil generates filenames from EXIF datetime, same for same image)
+    local normal_dir="$E2E_OUTPUT_DIR/normal"
+    local preserve_dir="$E2E_OUTPUT_DIR/preserve"
+    mkdir -p "$normal_dir" "$preserve_dir"
+
     local json_normal="$E2E_OUTPUT_DIR/normal.json"
     local json_preserve="$E2E_OUTPUT_DIR/preserve.json"
 
     # Download without preserve (normal compression)
-    if ! "$E2E_GIIL_BIN" "$TEST_URL" --json --output "$E2E_OUTPUT_DIR" --timeout 120 > "$json_normal" 2>/dev/null; then
+    if ! "$E2E_GIIL_BIN" "$TEST_URL" --json --output "$normal_dir" --timeout 120 > "$json_normal" 2>/dev/null; then
         log_fail "[$test_name] Normal download failed"
         ((TESTS_FAILED++))
         return 1
@@ -221,8 +227,8 @@ test_preserve_mode() {
     local normal_size
     normal_size=$(stat -c%s "$normal_path" 2>/dev/null || stat -f%z "$normal_path" 2>/dev/null || echo "0")
 
-    # Download with --preserve
-    if ! "$E2E_GIIL_BIN" "$TEST_URL" --preserve --json --output "$E2E_OUTPUT_DIR" --timeout 120 > "$json_preserve" 2>/dev/null; then
+    # Download with --preserve to separate directory
+    if ! "$E2E_GIIL_BIN" "$TEST_URL" --preserve --json --output "$preserve_dir" --timeout 120 > "$json_preserve" 2>/dev/null; then
         log_fail "[$test_name] Preserve download failed"
         ((TESTS_FAILED++))
         return 1
@@ -321,18 +327,24 @@ test_quality_setting() {
 
     log_info "Testing: --quality 50 mode..."
 
+    # Use separate subdirectories to avoid filename collisions
+    # (giil generates filenames from EXIF datetime, same for same image)
+    local high_dir="$E2E_OUTPUT_DIR/quality_high"
+    local low_dir="$E2E_OUTPUT_DIR/quality_low"
+    mkdir -p "$high_dir" "$low_dir"
+
     local json_high="$E2E_OUTPUT_DIR/quality_high.json"
     local json_low="$E2E_OUTPUT_DIR/quality_low.json"
 
     # Download with default quality (typically 85)
-    if ! "$E2E_GIIL_BIN" "$TEST_URL" --json --output "$E2E_OUTPUT_DIR" --timeout 120 > "$json_high" 2>/dev/null; then
+    if ! "$E2E_GIIL_BIN" "$TEST_URL" --json --output "$high_dir" --timeout 120 > "$json_high" 2>/dev/null; then
         log_fail "[$test_name] High quality download failed"
         ((TESTS_FAILED++))
         return 1
     fi
 
-    # Download with low quality
-    if ! "$E2E_GIIL_BIN" "$TEST_URL" --quality 50 --json --output "$E2E_OUTPUT_DIR" --timeout 120 > "$json_low" 2>/dev/null; then
+    # Download with low quality to separate directory
+    if ! "$E2E_GIIL_BIN" "$TEST_URL" --quality 50 --json --output "$low_dir" --timeout 120 > "$json_low" 2>/dev/null; then
         log_fail "[$test_name] Low quality download failed"
         ((TESTS_FAILED++))
         return 1
@@ -348,8 +360,14 @@ test_quality_setting() {
     path_high=$(jq -r '.path // empty' "$json_high")
     path_low=$(jq -r '.path // empty' "$json_low")
 
-    if [[ ! -f "$path_high" || ! -f "$path_low" ]]; then
-        log_fail "[$test_name] Output files not found"
+    if [[ -z "$path_high" || ! -f "$path_high" ]]; then
+        log_fail "[$test_name] High quality output file not found"
+        ((TESTS_FAILED++))
+        return 1
+    fi
+
+    if [[ -z "$path_low" || ! -f "$path_low" ]]; then
+        log_fail "[$test_name] Low quality output file not found"
         ((TESTS_FAILED++))
         return 1
     fi
