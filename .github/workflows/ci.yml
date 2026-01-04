@@ -56,9 +56,24 @@ jobs:
           node --check /tmp/extractor.mjs
           echo "✓ Embedded JavaScript syntax is valid"
 
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run pure function unit tests
+        run: |
+          node --test scripts/tests/*.test.mjs
+
   install-test:
     name: Installation Test
-    needs: [shellcheck, syntax-check]
+    needs: [shellcheck, syntax-check, unit-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -90,7 +105,7 @@ jobs:
 
   real-link-test:
     name: Real iCloud Link Test
-    needs: [shellcheck, syntax-check]
+    needs: [shellcheck, syntax-check, unit-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
