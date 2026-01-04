@@ -92,6 +92,7 @@ This bridges your Apple devices and remote AI coding sessions. No file transfers
 - [Output Modes](#-output-modes)
 - [Album Mode](#-album-mode)
 - [How It Works](#-how-it-works)
+- [Browser Emulation](#-browser-emulation)
 - [Capture Strategies in Detail](#-capture-strategies-in-detail)
 - [Platform-Specific Optimizations](#-platform-specific-optimizations)
 - [Image Processing Pipeline](#-image-processing-pipeline)
@@ -241,6 +242,39 @@ GIIL_SYSTEM=1 curl -fsSL .../install.sh | bash
 
 # Skip PATH modification
 GIIL_NO_ALIAS=1 curl -fsSL .../install.sh | bash
+
+# Verified installation with SHA256 checksum
+GIIL_VERIFY=1 curl -fsSL .../install.sh | bash
+
+# Install specific version
+GIIL_VERSION=2.1.0 curl -fsSL .../install.sh | bash
+```
+
+</details>
+
+<details>
+<summary><strong>Checksum verification</strong></summary>
+
+For security-conscious installations, giil supports SHA256 checksum verification:
+
+```bash
+GIIL_VERIFY=1 curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh | bash
+```
+
+**How it works:**
+1. Downloads `giil` script from the release
+2. Fetches `giil.sha256` checksum file from the same release
+3. Computes SHA256 of downloaded file
+4. Compares against expected checksum
+5. Aborts installation if mismatch detected
+
+**Requirements:**
+- Either `sha256sum` (Linux) or `shasum` (macOS)
+- GitHub release must include `giil.sha256` file
+
+**Output on success:**
+```
+✓ Checksum verified: a1b2c3d4e5f6...
 ```
 
 </details>
@@ -437,6 +471,27 @@ giil "https://share.icloud.com/photos/XXX" --base64 --json
 }
 ```
 
+### URL-Only Mode: `--print-url`
+
+Extracts and outputs the resolved CDN URL without downloading the image. Useful for debugging, external downloaders, or caching strategies.
+
+```bash
+giil "https://share.icloud.com/photos/XXX" --print-url
+# stdout: https://cvws.icloud-content.com/B/...
+```
+
+**Use cases:**
+- **Debugging:** See what CDN URL giil would capture
+- **External tools:** Pass URL to `curl`, `wget`, or another downloader
+- **Caching:** Store URLs for later batch download
+- **Inspection:** Verify which CDN is serving the image
+
+**Example with curl:**
+```bash
+CDN_URL=$(giil "https://share.icloud.com/photos/XXX" --print-url 2>/dev/null)
+curl -o photo.jpg "$CDN_URL"
+```
+
 ---
 
 ## 📚 Album Mode
@@ -587,6 +642,59 @@ Album mode implements respectful rate limiting to avoid overwhelming cloud servi
 
 ---
 
+## 🌐 Browser Emulation
+
+giil uses Playwright to drive a headless Chromium browser that appears indistinguishable from a real user's browser. This is essential for bypassing bot detection on cloud services.
+
+### Realistic Browser Configuration
+
+```javascript
+// Browser context settings
+{
+    viewport: { width: 1920, height: 1080 },
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
+               'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+               'Chrome/122.0.0.0 Safari/537.36'
+}
+```
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| Viewport | 1920×1080 | Standard desktop resolution |
+| User-Agent | Chrome 122 on macOS | Modern, common browser fingerprint |
+| Headless | true | No visible window (server-compatible) |
+
+### Automatic Overlay Dismissal
+
+Cloud services often show cookie consent banners, subscription prompts, or other overlays that can block image capture. giil automatically dismisses these:
+
+```javascript
+// Button texts that trigger auto-click
+['Accept', 'Allow', 'OK', 'Continue', 'Not Now', 'Close', 'Dismiss', 'Got it']
+```
+
+**How it works:**
+1. After page load, giil scans for visible buttons with these labels
+2. Buttons are clicked in sequence with brief delays
+3. Continues silently if no overlays are found
+
+### Network Idle Detection
+
+giil waits for pages to fully stabilize before capturing:
+
+```javascript
+await page.waitForLoadState('networkidle', { timeout: settleTimeout });
+```
+
+**What "network idle" means:**
+- No network requests for 500ms
+- All images, scripts, and assets loaded
+- Dynamic content has finished rendering
+
+This ensures high-resolution images are fully loaded before capture attempts begin.
+
+---
+
 ## 🎯 Capture Strategies in Detail
 
 giil implements a **four-tier fallback strategy** to maximize reliability across different iCloud page states and configurations.
@@ -622,9 +730,10 @@ giil implements a **four-tier fallback strategy** to maximize reliability across
 ### Strategy 2: Network Interception (Full Resolution)
 
 ```javascript
-// CDN detection:
+// CDN detection patterns:
 url.includes('cvws.icloud-content.com') ||
-url.includes('icloud-content.com')
+url.includes('icloud-content.com') ||
+url.includes('lh3.googleusercontent.com/pw/')  // Google Photos
 
 // Content-type filtering:
 'image/jpeg', 'image/png', 'image/heic', 'image/heif', 'image/webp'
@@ -632,9 +741,23 @@ url.includes('icloud-content.com')
 
 **How it works:**
 1. Install response handler **before** page navigation
-2. Monitor all HTTP responses for iCloud CDN patterns
-3. Capture image buffers, keep largest (>10KB threshold)
-4. Use captured buffer if download button fails
+2. Monitor all HTTP responses for CDN patterns
+3. Filter by content-type (image formats only)
+4. Capture image buffers, track largest (>10KB threshold)
+5. Use captured buffer if download button fails
+
+**The 10KB threshold:**
+- Thumbnails and icons are typically <10KB
+- Full-resolution images are almost always >10KB
+- This prevents capturing preview images instead of originals
+
+**CDN selection algorithm:**
+```
+for each HTTP response:
+    if URL matches CDN pattern AND content-type is image:
+        if buffer.size > currentLargest.size AND buffer.size > 10KB:
+            currentLargest = buffer
+```
 
 **Advantages:**
 - Captures full-resolution CDN images
@@ -1446,6 +1569,37 @@ case $? in
     12) echo "Link expired" ;;
     *) echo "Failed with code $?" ;;
 esac
+```
+
+### Intelligent Error Classification
+
+giil analyzes error messages to provide meaningful exit codes and remediation hints. This happens automatically—no configuration needed.
+
+**Error message pattern matching:**
+
+| Error Pattern | Classified As | Exit Code |
+|---------------|---------------|-----------|
+| `timeout`, `net::err`, `dns` | Network Error | 10 |
+| `404`, `not found`, `expired` | Not Found | 12 |
+| `login`, `auth`, `password` | Auth Required | 11 |
+| `video`, `unsupported` | Unsupported Type | 13 |
+| HTML content with image content-type | Auth Required | 11 |
+| HTML magic bytes in response | Auth Required | 11 |
+
+**Why this matters:**
+
+Cloud services often return HTTP 200 with an HTML login page when authentication is required. giil detects this through content validation (magic bytes, HTML detection) and correctly reports it as `AUTH_REQUIRED` rather than a generic capture failure.
+
+**JSON error responses include remediation hints:**
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "AUTH_REQUIRED",
+    "message": "Redirect to login page detected",
+    "remediation": "The file is not publicly shared. The owner must enable public access."
+  }
+}
 ```
 
 ---
