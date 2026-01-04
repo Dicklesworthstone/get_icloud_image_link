@@ -53,7 +53,7 @@ jobs:
           ## Installation
 
           ```bash
-          curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/giil/main/install.sh | bash
           ```
 
           ## Verify Installation (Optional)
@@ -62,7 +62,7 @@ jobs:
 
           ```bash
           # Verify giil script
-          echo "$(curl -fsSL https://github.com/Dicklesworthstone/get_icloud_image_link/releases/download/v${{ steps.version.outputs.version }}/giil.sha256)  giil" | sha256sum -c -
+          echo "$(curl -fsSL https://github.com/Dicklesworthstone/giil/releases/download/v${{ steps.version.outputs.version }}/giil.sha256)  giil" | sha256sum -c -
           ```
 
           ## Checksums

@@ -4,7 +4,7 @@
 # Downloads and installs giil (Get iCloud Image Link) to your system
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/giil/main/install.sh | bash
 #
 # Options (via environment variables):
 #   DEST=/path/to/dir      Install directory (default: ~/.local/bin)
@@ -26,7 +26,7 @@ NC='\033[0m'
 
 # Configuration
 REPO_OWNER="Dicklesworthstone"
-REPO_NAME="get_icloud_image_link"
+REPO_NAME="giil"
 REPO_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main"
 RELEASES_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases"
 SCRIPT_NAME="giil"

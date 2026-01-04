@@ -82,10 +82,10 @@ giil is distributed with an installer that fetches **versioned release artifacts
 
 ```bash
 # Install latest stable release (recommended)
-curl -fsSL "https://github.com/Dicklesworthstone/get_icloud_image_link/releases/latest/download/install.sh" | bash
+curl -fsSL "https://github.com/Dicklesworthstone/giil/releases/latest/download/install.sh" | bash
 
 # With checksum verification
-curl -fsSL "https://github.com/Dicklesworthstone/get_icloud_image_link/releases/latest/download/install.sh" | GIIL_VERIFY=1 bash
+curl -fsSL "https://github.com/Dicklesworthstone/giil/releases/latest/download/install.sh" | GIIL_VERIFY=1 bash
 ```
 
 Optional distribution channels (future):

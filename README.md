@@ -27,7 +27,7 @@
 <p align="center">
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh?v=3.0.0" | bash
+curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/giil/main/install.sh?v=3.0.0" | bash
 ```
 
 </p>
@@ -212,7 +212,7 @@ MozJPEG compression by default:
 
 **One-liner (recommended):**
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh?v=3.0.0" | bash
+curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/giil/main/install.sh?v=3.0.0" | bash
 ```
 
 <details>
@@ -220,7 +220,7 @@ curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image
 
 ```bash
 # Download script
-curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/giil -o ~/.local/bin/giil
+curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/giil/main/giil -o ~/.local/bin/giil
 chmod +x ~/.local/bin/giil
 
 # Ensure ~/.local/bin is in PATH
@@ -258,7 +258,7 @@ GIIL_VERSION=2.1.0 curl -fsSL .../install.sh | bash
 For security-conscious installations, giil supports SHA256 checksum verification:
 
 ```bash
-GIIL_VERIFY=1 curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh | bash
+GIIL_VERIFY=1 curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/giil/main/install.sh | bash
 ```
 
 **How it works:**
@@ -1774,7 +1774,7 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-**[Report Bug](https://github.com/Dicklesworthstone/get_icloud_image_link/issues) · [Request Feature](https://github.com/Dicklesworthstone/get_icloud_image_link/issues)**
+**[Report Bug](https://github.com/Dicklesworthstone/giil/issues) · [Request Feature](https://github.com/Dicklesworthstone/giil/issues)**
 
 ---
 

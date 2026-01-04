@@ -110,7 +110,7 @@ This is a **hybrid project**: a Bash wrapper script with an embedded Node.js ext
 ## Repo Layout
 
 ```
-get_icloud_image_link/
+giil/
 ├── giil                                    # Main script (~2600 LOC: ~1150 bash + ~1450 embedded JS)
 ├── install.sh                              # Curl-bash installer (~350 LOC)
 ├── README.md                               # Comprehensive documentation
@@ -519,7 +519,7 @@ Example:
 
 ```
 mcp__morph-mcp__warp_grep(
-  repoPath: "/data/projects/get_icloud_image_link",
+  repoPath: "/data/projects/giil",
   query: "How does the 4-tier capture strategy decide which method to use?"
 )
 ```
