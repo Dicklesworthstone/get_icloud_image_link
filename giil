@@ -1393,10 +1393,29 @@ async function captureSinglePhoto(page, context, options, imageCapture = null) {
     // STRATEGY 2: Use intercepted CDN image
     // ========================================
     if (!finalBuffer && bestImageBuffer && bestImageSize > 10000) {
-        finalBuffer = bestImageBuffer;
-        captureMethod = 'network';
-        sourceUrl = bestImageUrl;
-        console.error(`[giil] Captured from CDN: ${(bestImageSize / 1024).toFixed(1)} KB`);
+        // For Google Photos, try to download full-resolution using =s0 modifier
+        if (bestImageUrl && bestImageUrl.includes('googleusercontent.com/')) {
+            console.error('[giil] Google Photos detected, trying full-resolution download...');
+            const fullResResult = await downloadGooglePhotosFullRes(bestImageUrl);
+            if (fullResResult && fullResResult.buffer) {
+                finalBuffer = fullResResult.buffer;
+                captureMethod = 'url-extraction';
+                sourceUrl = fullResResult.url;
+                console.error(`[giil] Google Photos full-res: ${(finalBuffer.length / 1024).toFixed(1)} KB`);
+            } else {
+                // Fall back to captured preview
+                finalBuffer = bestImageBuffer;
+                captureMethod = 'network';
+                sourceUrl = bestImageUrl;
+                console.error(`[giil] Using Google Photos preview: ${(bestImageSize / 1024).toFixed(1)} KB`);
+            }
+        } else {
+            // Standard CDN capture (iCloud, etc.)
+            finalBuffer = bestImageBuffer;
+            captureMethod = 'network';
+            sourceUrl = bestImageUrl;
+            console.error(`[giil] Captured from CDN: ${(bestImageSize / 1024).toFixed(1)} KB`);
+        }
     }
 
     // ========================================
@@ -1405,8 +1424,15 @@ async function captureSinglePhoto(page, context, options, imageCapture = null) {
     if (!finalBuffer) {
         console.error('[giil] Trying element screenshot...');
         const imgSelectors = [
+            // iCloud selectors
             'img[src*="cvws.icloud-content"]',
             'img[src*="icloud-content"]',
+            // Google Photos selectors
+            'img[src*="googleusercontent.com"]',
+            'img[src*="lh3.googleusercontent"]',
+            '[data-latest-bg]',
+            '.RY3tic',
+            // Generic selectors
             '.photo-viewer img',
             '.media-viewer img',
             '[data-testid="photo"] img',
