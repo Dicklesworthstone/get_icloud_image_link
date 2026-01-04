@@ -1033,6 +1033,111 @@ function getGoogleDriveViewerUrl(fileId) {
     return `https://drive.google.com/file/d/${fileId}/view`;
 }
 
+/**
+ * Check if Google Drive page indicates authentication is required
+ * @param {import('playwright').Page} page - Playwright page instance
+ * @returns {Promise<{needsAuth: boolean, reason: string|null}>}
+ */
+async function checkGoogleDriveAuth(page) {
+    const currentUrl = page.url();
+
+    // Check for login redirect
+    if (currentUrl.includes('accounts.google.com')) {
+        return {
+            needsAuth: true,
+            reason: 'File requires authentication. Set sharing to "Anyone with the link".'
+        };
+    }
+
+    // Check for "request access" page
+    try {
+        const requestAccessBtn = await page.$('button:has-text("Request access")');
+        if (requestAccessBtn) {
+            return {
+                needsAuth: true,
+                reason: 'File is restricted. Owner must grant access or share publicly.'
+            };
+        }
+    } catch (e) {
+        // Selector didn't match, that's fine
+    }
+
+    // Check for common error indicators in page content
+    try {
+        const content = await page.content();
+        if (content.includes('You need permission') ||
+            content.includes('Request access') ||
+            content.includes('sign in to continue')) {
+            return {
+                needsAuth: true,
+                reason: 'Access denied. File is not publicly shared.'
+            };
+        }
+        if (content.includes('Sorry, the file you have requested does not exist') ||
+            content.includes('Sorry, unable to open the file')) {
+            return {
+                needsAuth: false,
+                reason: 'FILE_NOT_FOUND: File may have been deleted or link is invalid.'
+            };
+        }
+    } catch (e) {
+        // Page content not accessible
+    }
+
+    return { needsAuth: false, reason: null };
+}
+
+/**
+ * Validate that a response buffer is not an HTML error page
+ * @param {Buffer} buffer - Response buffer to check
+ * @returns {{isError: boolean, errorType: string|null, message: string|null}}
+ */
+function validateGoogleDriveResponse(buffer) {
+    if (!buffer || buffer.length < 100) {
+        return { isError: true, errorType: 'EMPTY_RESPONSE', message: 'Empty or too small response' };
+    }
+
+    // Check first 1KB for HTML error indicators
+    const text = buffer.toString('utf8', 0, Math.min(buffer.length, 1000));
+
+    if (text.includes('accounts.google.com/ServiceLogin') ||
+        text.includes('accounts.google.com/signin')) {
+        return {
+            isError: true,
+            errorType: 'AUTH_REQUIRED',
+            message: 'Login required. File is not publicly shared.'
+        };
+    }
+
+    if (text.includes('Request access') || text.includes('You need permission')) {
+        return {
+            isError: true,
+            errorType: 'AUTH_REQUIRED',
+            message: 'Access denied. File is restricted.'
+        };
+    }
+
+    if (text.includes('Sorry, the file you have requested does not exist') ||
+        text.includes('file could not be found')) {
+        return {
+            isError: true,
+            errorType: 'NOT_FOUND',
+            message: 'File not found. May have been deleted or link is invalid.'
+        };
+    }
+
+    // Check if response looks like HTML (not an image)
+    if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+        return {
+            isError: true,
+            errorType: 'HTML_ERROR',
+            message: 'Received HTML instead of image. File may not be accessible.'
+        };
+    }
+
+    return { isError: false, errorType: null, message: null };
+}
+
 // v3 JSON Schema Helper: format success output
 // Wraps all output with schema_version, ok, and platform fields
 function formatJsonSuccess(data) {
@@ -1791,7 +1896,9 @@ async function extractImage() {
                                     captureMethod: 'url-extraction',
                                     sourceUrl: fullResResult.url,
                                     downloadedFilePath: null,
-                                    index: i + 1
+                                    index: i + 1,
+                                    optimize: optimizeMode,
+                                    convert: convertFormat
                                 });
                                 results.push(result);
                             }
@@ -2265,9 +2372,11 @@ main() {
             log_debug "Timeout: ${TIMEOUT}s"
             log_debug "JSON output: $JSON_OUTPUT"
             log_debug "All mode: $ALL_MODE"
+            log_debug "Optimize: $OPTIMIZE_MODE"
+            log_debug "Convert: ${CONVERT_FORMAT:-none}"
 
             cd "$GIIL_HOME"
-            node "$script_path" "$URL" "$OUTPUT_DIR" "$QUALITY" "$BASE64_OUTPUT" "$DEBUG_MODE" "$TIMEOUT" "$JSON_OUTPUT" "$ALL_MODE"
+            node "$script_path" "$URL" "$OUTPUT_DIR" "$QUALITY" "$BASE64_OUTPUT" "$DEBUG_MODE" "$TIMEOUT" "$JSON_OUTPUT" "$ALL_MODE" "$OPTIMIZE_MODE" "$CONVERT_FORMAT"
             ;;
     esac
 }
