@@ -5,7 +5,7 @@
 
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
-import { readFileSync, writeFileSync, unlinkSync } from 'fs';
+import { writeFileSync, unlinkSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';

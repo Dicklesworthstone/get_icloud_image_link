@@ -1,30 +1,31 @@
 #!/usr/bin/env bash
 # Unit test runner for giil pure functions
 # Uses Node.js 18+ native test runner
+#
+# Note: Each test file extracts functions independently in its before() hook.
+# This script is a simple convenience wrapper for local development.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEMP_DIR="${TMPDIR:-/tmp}"
-EXTRACTED_MODULE="$TEMP_DIR/giil-pure-functions.mjs"
 
 echo "=== giil Unit Tests ==="
 echo ""
 
-# Step 1: Extract pure functions from giil
-echo "[1/3] Extracting pure functions from giil..."
-node "$SCRIPT_DIR/extract-functions.mjs" > "$EXTRACTED_MODULE"
-echo "      Extracted to: $EXTRACTED_MODULE"
+# Verify extraction works (quick sanity check)
+echo "[1/2] Verifying function extraction..."
+if ! node "$SCRIPT_DIR/extract-functions.mjs" > /dev/null 2>&1; then
+    echo "ERROR: Failed to extract functions from giil"
+    exit 1
+fi
+echo "      Extraction OK"
 
-# Step 2: Run tests
+# Run tests (each test file handles its own extraction in before() hook)
 echo ""
-echo "[2/3] Running unit tests..."
+echo "[2/2] Running unit tests..."
 echo ""
 
-# Run all test files
-NODE_OPTIONS="--experimental-vm-modules" node --test "$SCRIPT_DIR"/*.test.mjs
+node --test "$SCRIPT_DIR"/*.test.mjs
 
 echo ""
-echo "[3/3] Cleanup..."
-rm -f "$EXTRACTED_MODULE"
-echo "      Done!"
+echo "Done!"
