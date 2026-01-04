@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.1.0-blue?style=for-the-badge" alt="Version" />
+  <img src="https://img.shields.io/badge/version-3.0.0-blue?style=for-the-badge" alt="Version" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-blueviolet?style=for-the-badge" alt="Platform" />
   <img src="https://img.shields.io/badge/runtime-Node.js%2018+-purple?style=for-the-badge" alt="Runtime" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License" />
@@ -27,7 +27,7 @@
 <p align="center">
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh?v=2.1.0" | bash
+curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh?v=3.0.0" | bash
 ```
 
 </p>
@@ -184,12 +184,12 @@ EXIF-aware datetime stamping:
 </td>
 <td width="50%">
 
-### Optimized Compression
-MozJPEG for superior file sizes:
-- Configurable quality (1-100)
-- 40-50% smaller than originals
-- 4:2:0 chroma subsampling
-- Preserves visual quality
+### Image Processing
+v3.0+ preserves original bytes by default:
+- `--optimize` for MozJPEG compression
+- `--convert` for format conversion
+- Quality configurable (1-100)
+- HEIC auto-conversion supported
 
 </td>
 </tr>
@@ -203,7 +203,7 @@ MozJPEG for superior file sizes:
 
 **One-liner (recommended):**
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh?v=2.1.0" | bash
+curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/get_icloud_image_link/main/install.sh?v=3.0.0" | bash
 ```
 
 <details>
@@ -258,7 +258,9 @@ giil <icloud-photo-url> [options]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--output DIR` | `.` | Output directory for saved images |
-| `--quality N` | `85` | JPEG quality (1-100) |
+| `--optimize` | off | Apply MozJPEG optimization (opt-in compression) |
+| `--convert FMT` | — | Convert to format: `jpeg`, `png`, `webp` |
+| `--quality N` | `85` | JPEG/WebP quality 1-100 (with `--optimize` or `--convert`) |
 | `--base64` | off | Output base64 to stdout instead of saving file |
 | `--json` | off | Output JSON metadata (path, datetime, dimensions, method) |
 | `--all` | off | Download all photos from a shared album |
@@ -267,6 +269,9 @@ giil <icloud-photo-url> [options]
 | `--update` | off | Force reinstall of Playwright and dependencies |
 | `--version` | — | Print version and exit |
 | `--help` | — | Show help message |
+
+> **v3.0 Behavior Change:** Original image bytes are now preserved by default (no recompression).
+> Use `--optimize` for MozJPEG compression or `--convert` for format conversion.
 
 ### Supported URL Formats
 
@@ -476,7 +481,7 @@ giil "https://share.icloud.com/photos/XXX" --all --output ~/album
 6. **Image Processing**
    - Extracts EXIF datetime for filename
    - Converts HEIC/HEIF if necessary
-   - Compresses with MozJPEG
+   - Preserves original bytes (v3.0+) or compresses with `--optimize`
 
 7. **Output Generation**
    - Writes file to disk (or base64 to stdout)
@@ -689,9 +694,22 @@ sudo apt-get install libheif-examples  # Debian/Ubuntu
 sudo dnf install libheif-tools         # Fedora
 ```
 
-### MozJPEG Compression
+### MozJPEG Compression (Opt-in)
 
-giil uses Sharp with MozJPEG for superior compression:
+**v3.0+:** By default, giil preserves the original image bytes without recompression. Use `--optimize` to enable MozJPEG compression:
+
+```bash
+# Preserve original bytes (default)
+giil "https://share.icloud.com/photos/..."
+
+# Apply MozJPEG optimization
+giil "https://share.icloud.com/photos/..." --optimize
+
+# Convert to WebP format
+giil "https://share.icloud.com/photos/..." --convert webp
+```
+
+When `--optimize` is used, Sharp applies MozJPEG:
 
 ```javascript
 sharp(buffer).jpeg({
@@ -701,7 +719,7 @@ sharp(buffer).jpeg({
 })
 ```
 
-**Compression characteristics:**
+**Compression characteristics (with --optimize):**
 - **40-50% smaller** than standard JPEG at equivalent quality
 - **4:2:0 chroma subsampling** reduces color data (imperceptible to human eye)
 - **Quality 85** provides excellent visual quality with significant size reduction
