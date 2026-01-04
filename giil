@@ -390,6 +390,10 @@ DEBUG_MODE=false
 TIMEOUT=60
 OPTIMIZE_MODE=false
 CONVERT_FORMAT=""
+PRINT_URL=false
+VERBOSE=false
+TRACE_MODE=false
+DEBUG_DIR=""
 URL=""
 
 # XDG-compliant cache directory
