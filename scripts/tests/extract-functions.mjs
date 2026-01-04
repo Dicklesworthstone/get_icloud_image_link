@@ -58,6 +58,24 @@ const extractors = [
 
     // extractGooglePhotosBaseUrl function (pure URL manipulation)
     { name: 'extractGooglePhotosBaseUrl', pattern: /function extractGooglePhotosBaseUrl\(cdnUrl\) \{[\s\S]*?^\}/m },
+
+    // extractGoogleDriveFileId function (extract file ID from various URL formats)
+    { name: 'extractGoogleDriveFileId', pattern: /function extractGoogleDriveFileId\(urlStr\) \{[\s\S]*?^\}/m },
+
+    // getGoogleDriveDownloadUrl function (construct download URL)
+    { name: 'getGoogleDriveDownloadUrl', pattern: /function getGoogleDriveDownloadUrl\(fileId\) \{[\s\S]*?^\}/m },
+
+    // getGoogleDriveViewerUrl function (construct viewer URL)
+    { name: 'getGoogleDriveViewerUrl', pattern: /function getGoogleDriveViewerUrl\(fileId\) \{[\s\S]*?^\}/m },
+
+    // formatDateForFilename function (pure date formatting for filenames)
+    { name: 'formatDateForFilename', pattern: /function formatDateForFilename\(date\) \{[\s\S]*?^\}/m },
+
+    // formatDateForJson function (pure date formatting for JSON output)
+    { name: 'formatDateForJson', pattern: /function formatDateForJson\(date\) \{[\s\S]*?^\}/m },
+
+    // validateGoogleDriveResponse function (pure buffer validation)
+    { name: 'validateGoogleDriveResponse', pattern: /function validateGoogleDriveResponse\(buffer\) \{[\s\S]*?^\}/m },
 ];
 
 // Build the output module
@@ -97,7 +115,13 @@ export {
     formatJsonSuccess,
     formatJsonError,
     errorCodeToExit,
-    extractGooglePhotosBaseUrl
+    extractGooglePhotosBaseUrl,
+    extractGoogleDriveFileId,
+    getGoogleDriveDownloadUrl,
+    getGoogleDriveViewerUrl,
+    formatDateForFilename,
+    formatDateForJson,
+    validateGoogleDriveResponse
 };
 `;
 
