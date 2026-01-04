@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# giil - Get iCloud Image Link (Hybrid Edition v2.1)
+# giil - Get iCloud Image Link (Hybrid Edition v3.0)
 # Downloads images from iCloud photo shares with maximum reliability
 #
 # FEATURES:
@@ -23,7 +23,9 @@
 #   --json           Output JSON metadata instead of plain path
 #   --all            Download all photos from shared album
 #   --output DIR     Output directory (default: current)
-#   --quality N      JPEG quality 1-100 (default: 85)
+#   --optimize       Apply MozJPEG optimization (opt-in compression)
+#   --convert FMT    Convert to format: jpeg, png, webp
+#   --quality N      JPEG/WebP quality (default: 85, with --optimize/--convert)
 #   --update         Force update Playwright/dependencies
 #   --debug          Save debug artifacts on failure
 #   --timeout N      Page load timeout in seconds (default: 60)
@@ -33,7 +35,7 @@
 
 set -euo pipefail
 
-VERSION="2.1.0"
+VERSION="3.0.0"
 
 # -----------------------------------------------------------------------------
 # Exit Codes (v3.0+ extended scheme with backwards compatibility)
@@ -455,7 +457,7 @@ log_success() {
 
 show_help() {
     cat << 'EOF'
-giil - Get iCloud Image Link (Hybrid Edition v2.1)
+giil - Get iCloud Image Link (Hybrid Edition v3.0)
 Downloads images from iCloud photo shares with maximum reliability
 
 Usage:
@@ -466,12 +468,18 @@ Options:
   --json           Output JSON with path, datetime, sourceUrl, captureMethod
   --all            Download ALL photos from a shared album (iterates thumbnails)
   --output DIR     Output directory (default: current directory)
-  --quality N      JPEG quality 1-100 (default: 85)
+  --optimize       Apply MozJPEG optimization (opt-in compression)
+  --convert FMT    Convert to format: jpeg, png, webp
+  --quality N      JPEG/WebP quality 1-100 (default: 85, with --optimize/--convert)
   --update         Force update Playwright and dependencies
   --debug          Enable debug mode with extra logging and artifacts
   --timeout N      Page load timeout in seconds (default: 60)
   --version        Show version information
   --help           Show this help message
+
+v3.0 Behavior Change:
+  Original image bytes are now preserved by default (no recompression).
+  Use --optimize for MozJPEG compression or --convert for format conversion.
 
 Supported URL formats:
   https://share.icloud.com/photos/<id>
@@ -979,6 +987,50 @@ async function downloadGooglePhotosFullRes(cdnUrl) {
         console.error(`[giil] Google Photos download error: ${e.message}`);
         return null;
     }
+}
+
+// -----------------------------------------------------------------------------
+// Google Drive URL Helpers (v3.0+)
+// -----------------------------------------------------------------------------
+// Google Drive shares various URL formats that all contain a file ID.
+// Once extracted, we can construct direct download URLs.
+
+/**
+ * Extract file ID from various Google Drive URL formats
+ * @param {string} urlStr - The Google Drive URL
+ * @returns {string|null} File ID or null if not found
+ */
+function extractGoogleDriveFileId(urlStr) {
+    const patterns = [
+        /\/file\/d\/([a-zA-Z0-9_-]+)/,      // /file/d/{id}/view
+        /\/open\?id=([a-zA-Z0-9_-]+)/,       // /open?id={id}
+        /[?&]id=([a-zA-Z0-9_-]+)/            // ?id={id} or &id={id}
+    ];
+
+    for (const pattern of patterns) {
+        const match = urlStr.match(pattern);
+        if (match) return match[1];
+    }
+    return null;
+}
+
+/**
+ * Construct direct download URL for Google Drive file
+ * @param {string} fileId - The extracted file ID
+ * @returns {string} Direct download URL (may require auth)
+ */
+function getGoogleDriveDownloadUrl(fileId) {
+    // This URL works for publicly shared files with "Anyone with the link" access
+    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+}
+
+/**
+ * Construct viewer URL for Google Drive file
+ * @param {string} fileId - The extracted file ID
+ * @returns {string} Viewer URL
+ */
+function getGoogleDriveViewerUrl(fileId) {
+    return `https://drive.google.com/file/d/${fileId}/view`;
 }
 
 // v3 JSON Schema Helper: format success output
