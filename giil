@@ -2241,7 +2241,7 @@ extractImage().catch(err => {
     // Use error's exitCode if available (set by validation functions)
     if (err.exitCode) {
         exitCode = err.exitCode;
-        errorCode = err.errorCode || 'CAPTURE_FAILURE';
+        errorCode = err.code || 'CAPTURE_FAILURE';
         remediation = err.remediation || null;
     } else {
         // Map common error types to exit codes
