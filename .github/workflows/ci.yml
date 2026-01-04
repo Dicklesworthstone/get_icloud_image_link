@@ -104,7 +104,7 @@ jobs:
           export GIIL_LOG_FORMAT=json
           bash scripts/tests/e2e/${{ matrix.platform }}.test.sh
         env:
-          GIIL_CACHE_DIR: ${{ github.workspace }}/.ci-cache
+          GIIL_HOME: ${{ github.workspace }}/.ci-cache/giil
 
       - name: Skip if test not found
         if: ${{ hashFiles(format('scripts/tests/e2e/{0}.test.sh', matrix.platform)) == '' }}

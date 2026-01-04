@@ -376,7 +376,8 @@ show_quickstart() {
         echo -e "${DIM}${ITALIC}First run installs Playwright+Chromium (~200MB, cached in ~/.cache/giil)${NC}"
     fi
 
-    exit 0
+    # Missing URL is a usage error (exit 2), unlike --help which exits 0
+    exit "$EXIT_USAGE_ERROR"
 }
 
 # Default values

@@ -30,7 +30,7 @@ TESTS_SKIPPED=0
 # Test: JSON mode output structure
 test_json_mode() {
     local test_name="json_mode"
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 
     log_info "Testing: --json mode output structure..."
 
@@ -41,7 +41,7 @@ test_json_mode() {
     # Check if we got valid JSON output
     if [[ ! -s "$output_file" ]]; then
         log_fail "[$test_name] No JSON output captured"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
@@ -49,12 +49,12 @@ test_json_mode() {
     if command -v jq &>/dev/null; then
         if jq -e '.ok and .schema_version and .platform and .path' "$output_file" >/dev/null 2>&1; then
             log_pass "[$test_name] JSON output has required fields (ok, schema_version, platform, path)"
-            ((TESTS_PASSED++))
+            ((++TESTS_PASSED))
             return 0
         else
             log_fail "[$test_name] JSON missing required fields"
             log_debug "JSON content: $(cat "$output_file")"
-            ((TESTS_FAILED++))
+            ((++TESTS_FAILED))
             return 1
         fi
     elif command -v python3 &>/dev/null; then
@@ -80,16 +80,16 @@ PY
         )
         if [[ "$validation_result" == "PASS" ]]; then
             log_pass "[$test_name] JSON output has required fields"
-            ((TESTS_PASSED++))
+            ((++TESTS_PASSED))
             return 0
         else
             log_fail "[$test_name] JSON validation failed: $validation_result"
-            ((TESTS_FAILED++))
+            ((++TESTS_FAILED))
             return 1
         fi
     else
         log_warn "[$test_name] No jq or python3 available for JSON validation"
-        ((TESTS_SKIPPED++))
+        ((++TESTS_SKIPPED))
         return 0
     fi
 }
@@ -97,7 +97,7 @@ PY
 # Test: Base64 mode
 test_base64_mode() {
     local test_name="base64_mode"
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 
     log_info "Testing: --base64 mode..."
 
@@ -107,14 +107,14 @@ test_base64_mode() {
     # Run giil with --base64
     if ! "$E2E_GIIL_BIN" "$TEST_URL" --base64 --timeout 120 > "$output_file" 2>/dev/null; then
         log_fail "[$test_name] giil --base64 failed"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
     # Check if output is valid base64
     if [[ ! -s "$output_file" ]]; then
         log_fail "[$test_name] No base64 output"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
@@ -122,16 +122,16 @@ test_base64_mode() {
     if base64 -d < "$output_file" > "$decoded_file" 2>/dev/null; then
         if file "$decoded_file" | grep -qiE 'image|jpeg|png|webp|gif'; then
             log_pass "[$test_name] Base64 decodes to valid image"
-            ((TESTS_PASSED++))
+            ((++TESTS_PASSED))
             return 0
         else
             log_fail "[$test_name] Base64 decodes but not to valid image"
-            ((TESTS_FAILED++))
+            ((++TESTS_FAILED))
             return 1
         fi
     else
         log_fail "[$test_name] Invalid base64 encoding"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 }
@@ -139,7 +139,7 @@ test_base64_mode() {
 # Test: Base64 + JSON combined mode
 test_base64_json_mode() {
     local test_name="base64_json_mode"
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 
     log_info "Testing: --base64 --json combined mode..."
 
@@ -148,39 +148,39 @@ test_base64_json_mode() {
     # Run giil with --base64 --json
     if ! "$E2E_GIIL_BIN" "$TEST_URL" --base64 --json --timeout 120 > "$output_file" 2>/dev/null; then
         log_fail "[$test_name] giil --base64 --json failed"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
     if [[ ! -s "$output_file" ]]; then
         log_fail "[$test_name] No output"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
-    # Validate JSON has base64 data field
+    # Validate JSON has base64 field
     if command -v jq &>/dev/null; then
-        if jq -e '.ok and .data' "$output_file" >/dev/null 2>&1; then
-            # Verify the data field contains base64
+        if jq -e '.ok and .base64' "$output_file" >/dev/null 2>&1; then
+            # Verify the base64 field contains valid base64
             local data_field
-            data_field=$(jq -r '.data // empty' "$output_file")
+            data_field=$(jq -r '.base64 // empty' "$output_file")
             if [[ -n "$data_field" ]] && echo "$data_field" | base64 -d >/dev/null 2>&1; then
                 log_pass "[$test_name] JSON contains valid base64 data field"
-                ((TESTS_PASSED++))
+                ((++TESTS_PASSED))
                 return 0
             else
                 log_fail "[$test_name] data field is not valid base64"
-                ((TESTS_FAILED++))
+                ((++TESTS_FAILED))
                 return 1
             fi
         else
             log_fail "[$test_name] JSON missing ok or data field"
-            ((TESTS_FAILED++))
+            ((++TESTS_FAILED))
             return 1
         fi
     else
         log_warn "[$test_name] jq not available for validation"
-        ((TESTS_SKIPPED++))
+        ((++TESTS_SKIPPED))
         return 0
     fi
 }
@@ -188,7 +188,7 @@ test_base64_json_mode() {
 # Test: Preserve mode (skip compression)
 test_preserve_mode() {
     local test_name="preserve_mode"
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 
     log_info "Testing: --preserve mode (skip compression)..."
 
@@ -204,7 +204,7 @@ test_preserve_mode() {
     # Download without preserve (normal compression)
     if ! "$E2E_GIIL_BIN" "$TEST_URL" --json --output "$normal_dir" --timeout 120 > "$json_normal" 2>/dev/null; then
         log_fail "[$test_name] Normal download failed"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
@@ -214,13 +214,13 @@ test_preserve_mode() {
         normal_path=$(jq -r '.path // empty' "$json_normal")
     else
         log_warn "[$test_name] jq not available"
-        ((TESTS_SKIPPED++))
+        ((++TESTS_SKIPPED))
         return 0
     fi
 
     if [[ -z "$normal_path" || ! -f "$normal_path" ]]; then
         log_fail "[$test_name] Normal output file not found"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
@@ -230,7 +230,7 @@ test_preserve_mode() {
     # Download with --preserve to separate directory
     if ! "$E2E_GIIL_BIN" "$TEST_URL" --preserve --json --output "$preserve_dir" --timeout 120 > "$json_preserve" 2>/dev/null; then
         log_fail "[$test_name] Preserve download failed"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
@@ -239,7 +239,7 @@ test_preserve_mode() {
 
     if [[ -z "$preserve_path" || ! -f "$preserve_path" ]]; then
         log_fail "[$test_name] Preserve output file not found"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
@@ -252,11 +252,11 @@ test_preserve_mode() {
     # Note: This test may be flaky if the image is already optimally compressed
     if [[ "$preserve_size" -ge "$normal_size" ]]; then
         log_pass "[$test_name] Preserve mode produces same or larger file (compression skipped)"
-        ((TESTS_PASSED++))
+        ((++TESTS_PASSED))
     else
         # Not a hard failure - compression behavior can vary
         log_info "[$test_name] Preserve mode produced smaller file (may vary by image)"
-        ((TESTS_PASSED++))
+        ((++TESTS_PASSED))
     fi
     return 0
 }
@@ -264,7 +264,7 @@ test_preserve_mode() {
 # Test: Convert to WebP
 test_convert_webp() {
     local test_name="convert_webp"
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 
     log_info "Testing: --convert webp mode..."
 
@@ -273,7 +273,7 @@ test_convert_webp() {
     # Download with --convert webp
     if ! "$E2E_GIIL_BIN" "$TEST_URL" --convert webp --json --output "$E2E_OUTPUT_DIR" --timeout 120 > "$json_file" 2>/dev/null; then
         log_fail "[$test_name] WebP conversion failed"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
@@ -283,13 +283,13 @@ test_convert_webp() {
         output_path=$(jq -r '.path // empty' "$json_file")
     else
         log_warn "[$test_name] jq not available"
-        ((TESTS_SKIPPED++))
+        ((++TESTS_SKIPPED))
         return 0
     fi
 
     if [[ -z "$output_path" ]]; then
         log_fail "[$test_name] No output path in JSON"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
@@ -304,18 +304,18 @@ test_convert_webp() {
     if [[ -f "$output_path" ]]; then
         if file "$output_path" | grep -qi webp; then
             log_pass "[$test_name] File is valid WebP format"
-            ((TESTS_PASSED++))
+            ((++TESTS_PASSED))
             return 0
         else
             local file_type
             file_type=$(file "$output_path")
             log_fail "[$test_name] File is not WebP: $file_type"
-            ((TESTS_FAILED++))
+            ((++TESTS_FAILED))
             return 1
         fi
     else
         log_fail "[$test_name] Output file not found: $output_path"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 }
@@ -323,7 +323,7 @@ test_convert_webp() {
 # Test: Quality setting
 test_quality_setting() {
     local test_name="quality_setting"
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 
     log_info "Testing: --quality 50 mode..."
 
@@ -339,20 +339,20 @@ test_quality_setting() {
     # Download with default quality (typically 85)
     if ! "$E2E_GIIL_BIN" "$TEST_URL" --json --output "$high_dir" --timeout 120 > "$json_high" 2>/dev/null; then
         log_fail "[$test_name] High quality download failed"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
     # Download with low quality to separate directory
     if ! "$E2E_GIIL_BIN" "$TEST_URL" --quality 50 --json --output "$low_dir" --timeout 120 > "$json_low" 2>/dev/null; then
         log_fail "[$test_name] Low quality download failed"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
     if ! command -v jq &>/dev/null; then
         log_warn "[$test_name] jq not available"
-        ((TESTS_SKIPPED++))
+        ((++TESTS_SKIPPED))
         return 0
     fi
 
@@ -362,13 +362,13 @@ test_quality_setting() {
 
     if [[ -z "$path_high" || ! -f "$path_high" ]]; then
         log_fail "[$test_name] High quality output file not found"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
     if [[ -z "$path_low" || ! -f "$path_low" ]]; then
         log_fail "[$test_name] Low quality output file not found"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
         return 1
     fi
 
@@ -381,11 +381,11 @@ test_quality_setting() {
     # Lower quality should produce smaller file
     if [[ "$size_low" -lt "$size_high" ]]; then
         log_pass "[$test_name] Lower quality produces smaller file"
-        ((TESTS_PASSED++))
+        ((++TESTS_PASSED))
     else
         # Could be same size if already small, not a hard failure
         log_info "[$test_name] Quality setting may not affect this image significantly"
-        ((TESTS_PASSED++))
+        ((++TESTS_PASSED))
     fi
     return 0
 }

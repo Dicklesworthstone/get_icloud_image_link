@@ -52,7 +52,7 @@ assert_exit_code() {
 # Test: Network timeout with very short timeout
 test_network_timeout() {
     local test_name="network_timeout"
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 
     log_info "Testing: Network timeout (1 second timeout)..."
 
@@ -62,18 +62,18 @@ test_network_timeout() {
 
     if assert_exit_code "$EXIT_NETWORK_ERROR" "$test_url" --timeout 1; then
         log_pass "[$test_name] Exit code $EXIT_NETWORK_ERROR (network timeout) returned correctly"
-        ((TESTS_PASSED++))
+        ((++TESTS_PASSED))
     else
         # Sometimes the page might actually load in 1 second, so this isn't always reliable
         log_warn "[$test_name] Did not get expected exit code $EXIT_NETWORK_ERROR (test may be flaky)"
-        ((TESTS_SKIPPED++))
+        ((++TESTS_SKIPPED))
     fi
 }
 
 # Test: Not found (non-existent iCloud link)
 test_not_found() {
     local test_name="not_found"
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 
     log_info "Testing: Not found (non-existent link)..."
 
@@ -82,24 +82,24 @@ test_not_found() {
 
     if assert_exit_code "$EXIT_NOT_FOUND" "$test_url" --timeout 30; then
         log_pass "[$test_name] Exit code $EXIT_NOT_FOUND (not found) returned correctly"
-        ((TESTS_PASSED++))
+        ((++TESTS_PASSED))
     else
         # Could be network error or capture failure depending on how iCloud responds
         log_warn "[$test_name] Did not get expected exit code $EXIT_NOT_FOUND"
-        ((TESTS_SKIPPED++))
+        ((++TESTS_SKIPPED))
     fi
 }
 
 # Test: Auth required (if test URL provided)
 test_auth_required() {
     local test_name="auth_required"
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 
     local test_url="${GIIL_ERROR_AUTH_URL:-}"
 
     if [[ -z "$test_url" ]]; then
         log_info "Skipping: Auth required (no GIIL_ERROR_AUTH_URL configured)"
-        ((TESTS_SKIPPED++))
+        ((++TESTS_SKIPPED))
         return 0
     fi
 
@@ -107,23 +107,23 @@ test_auth_required() {
 
     if assert_exit_code "$EXIT_AUTH_REQUIRED" "$test_url" --timeout 30; then
         log_pass "[$test_name] Exit code $EXIT_AUTH_REQUIRED (auth required) returned correctly"
-        ((TESTS_PASSED++))
+        ((++TESTS_PASSED))
     else
         log_fail "[$test_name] Did not get expected exit code $EXIT_AUTH_REQUIRED"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
     fi
 }
 
 # Test: Unsupported type (video or document)
 test_unsupported_type() {
     local test_name="unsupported_type"
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 
     local test_url="${GIIL_ERROR_VIDEO_URL:-}"
 
     if [[ -z "$test_url" ]]; then
         log_info "Skipping: Unsupported type (no GIIL_ERROR_VIDEO_URL configured)"
-        ((TESTS_SKIPPED++))
+        ((++TESTS_SKIPPED))
         return 0
     fi
 
@@ -131,17 +131,17 @@ test_unsupported_type() {
 
     if assert_exit_code "$EXIT_UNSUPPORTED_TYPE" "$test_url" --timeout 30; then
         log_pass "[$test_name] Exit code $EXIT_UNSUPPORTED_TYPE (unsupported type) returned correctly"
-        ((TESTS_PASSED++))
+        ((++TESTS_PASSED))
     else
         log_fail "[$test_name] Did not get expected exit code $EXIT_UNSUPPORTED_TYPE"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
     fi
 }
 
 # Test: JSON error structure
 test_json_error_structure() {
     local test_name="json_error_structure"
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 
     log_info "Testing: JSON error response structure..."
 
@@ -155,14 +155,14 @@ test_json_error_structure() {
     # Check if output file exists and has content
     if [[ ! -s "$output_file" ]]; then
         log_warn "[$test_name] No JSON output captured"
-        ((TESTS_SKIPPED++))
+        ((++TESTS_SKIPPED))
         return 0
     fi
 
     # Validate JSON structure
     if ! command -v python3 &>/dev/null; then
         log_warn "[$test_name] python3 not available for JSON validation"
-        ((TESTS_SKIPPED++))
+        ((++TESTS_SKIPPED))
         return 0
     fi
 
@@ -196,15 +196,15 @@ PY
     case "$validation_result" in
         PASS)
             log_pass "[$test_name] JSON error structure is correct"
-            ((TESTS_PASSED++))
+            ((++TESTS_PASSED))
             ;;
         SKIP:*)
             log_info "[$test_name] Response was success, not error - skipping validation"
-            ((TESTS_SKIPPED++))
+            ((++TESTS_SKIPPED))
             ;;
         FAIL:*)
             log_fail "[$test_name] JSON error structure invalid: $validation_result"
-            ((TESTS_FAILED++))
+            ((++TESTS_FAILED))
             ;;
     esac
 }
@@ -212,7 +212,7 @@ PY
 # Test: Usage error (no URL)
 test_usage_error() {
     local test_name="usage_error"
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 
     log_info "Testing: Usage error (missing URL)..."
 
@@ -221,10 +221,10 @@ test_usage_error() {
 
     if [[ "$actual_code" -eq "$EXIT_USAGE_ERROR" ]]; then
         log_pass "[$test_name] Exit code $EXIT_USAGE_ERROR (usage error) returned correctly"
-        ((TESTS_PASSED++))
+        ((++TESTS_PASSED))
     else
         log_fail "[$test_name] Expected exit code $EXIT_USAGE_ERROR, got $actual_code"
-        ((TESTS_FAILED++))
+        ((++TESTS_FAILED))
     fi
 }
 
