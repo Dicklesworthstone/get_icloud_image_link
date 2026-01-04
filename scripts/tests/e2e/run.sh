@@ -58,16 +58,16 @@ run_test() {
     case $exit_code in
         0)
             log_test_result "$test_name" "pass" "$((duration * 1000))"
-            ((passed++))
+            ((++passed))
             ;;
         77)
             # Exit code 77 is standard "skipped" (used by autotools, bats, etc.)
             log_test_result "$test_name" "skip" "$((duration * 1000))"
-            ((skipped++))
+            ((++skipped))
             ;;
         *)
             log_test_result "$test_name" "fail" "$((duration * 1000))"
-            ((failed++))
+            ((++failed))
             ;;
     esac
 }
