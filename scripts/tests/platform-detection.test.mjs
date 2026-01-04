@@ -134,14 +134,11 @@ describe('detectPlatform', () => {
             assert.strictEqual(detectPlatform('not a url'), 'unknown');
         });
 
-        // TODO: This test documents current behavior. The regex should be fixed
-        // to use domain boundaries to prevent matching subdomain-like patterns.
-        // See: https://github.com/user/repo/issues/XXX
-        it('currently matches subdomain-like patterns (known issue)', () => {
-            // 'fakedropbox.com' matches because regex lacks domain boundary
+        it('rejects subdomain-like patterns (domain boundary check)', () => {
+            // 'fakedropbox.com' should NOT match - proper domain boundary required
             assert.strictEqual(
                 detectPlatform('https://fakedropbox.com/s/abc123'),
-                'dropbox'  // Current behavior - should be 'unknown' after fix
+                'unknown'
             );
         });
     });

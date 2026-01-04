@@ -160,14 +160,19 @@ giil (bash)
 
 ## Exit Codes
 
+v3.0 introduced an expanded exit code scheme. Codes 4-5 from v2 moved to 10-11.
+
 | Code | Meaning | When |
 |------|---------|------|
 | `0` | Success | Image captured and saved/output |
 | `1` | Capture failure | All capture strategies failed |
 | `2` | Invalid arguments | Bad CLI options, missing URL |
 | `3` | Dependency error | Node.js/Playwright/Chromium missing or failed |
-| `4` | Network/timeout | Page load timeout, network unreachable |
-| `5` | Auth required | File is not publicly shared (Google Drive) |
+| `10` | Network/timeout | Page load timeout, DNS failure, unreachable |
+| `11` | Auth required | Login redirect, password required, not public |
+| `12` | Not found | Expired link, deleted file, 404 |
+| `13` | Unsupported type | Video, Google Doc, non-image content |
+| `20` | Internal error | Bug in giil (please report!) |
 
 ---
 

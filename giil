@@ -704,7 +704,7 @@ ensure_playwright() {
         cat > "$package_json" << 'PACKAGE_EOF'
 {
   "name": "giil-runtime",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "dependencies": {
@@ -935,12 +935,17 @@ function formatDateForJson(date) {
 }
 
 // Helper: detect platform from URL (v3.0+)
+// Patterns use domain boundaries to prevent matching subdomains like fakedropbox.com
 function detectPlatform(urlStr) {
     const patterns = {
-        icloud: /(?:share\.)?icloud\.com\/photos/i,
-        dropbox: /dropbox\.com\/(?:s|scl\/fi|sh)\//i,
-        gphotos: /photos\.(?:app\.goo\.gl|google\.com\/share)/i,
-        gdrive: /(?:drive|docs)\.google\.com\/(?:file\/d|open\?id)/i
+        // icloud.com or share.icloud.com (preceded by // or .)
+        icloud: /(?:\/\/|\.)?(?:share\.)?icloud\.com\/photos/i,
+        // dropbox.com (preceded by // or .)
+        dropbox: /(?:\/\/|\.)dropbox\.com\/(?:s|scl\/fi|sh)\//i,
+        // photos.app.goo.gl or photos.google.com (preceded by // or .)
+        gphotos: /(?:\/\/|\.)photos\.(?:app\.goo\.gl|google\.com\/share)/i,
+        // drive.google.com or docs.google.com (preceded by // or .)
+        gdrive: /(?:\/\/|\.)(?:drive|docs)\.google\.com\/(?:file\/d|open\?id)/i
     };
 
     for (const [platform, regex] of Object.entries(patterns)) {
